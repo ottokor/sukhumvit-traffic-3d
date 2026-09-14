@@ -99,6 +99,11 @@ Nothing in the frontend needs an environment variable. The TomTom key lives only
 
 Or from a terminal: `gh secret set TOMTOM_API_KEY` (it prompts for the value, nothing is echoed).
 
+To confirm the Claude token works before starting a pipeline, run the **Claude auth check** workflow
+from the Actions tab (`claude-auth-check.yml`). It asks Claude for the word "OK" with full output on,
+so a `401 OAuth access token is invalid` shows up in plain text instead of a silent pipeline failure.
+Test the token locally first with `CLAUDE_CODE_OAUTH_TOKEN=<token> claude -p "say OK"`.
+
 ---
 
 ## The agent pipeline
