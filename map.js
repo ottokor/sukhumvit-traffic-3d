@@ -189,11 +189,12 @@ function addPois() {
       'text-field': ['get', 'label'],
       'text-font': FONT,
       'text-size': 12.5,
-      // Stations label below their dot, parks to the left, so Benjasiri and Phrom Phong don't collide.
-      'text-offset': ['match', ['get', 'type'], 'park', ['literal', [-0.8, 0]], ['literal', [0, 0.9]]],
-      'text-anchor': ['match', ['get', 'type'], 'park', 'right', 'top'],
-      'text-allow-overlap': true,
-      'text-ignore-placement': true,
+      // Collision-aware placement: try below, then right/left/above, so Benjasiri Park and
+      // Phrom Phong never overlap whichever way the view is rotated. Stations win ties.
+      'text-variable-anchor': ['top', 'right', 'left', 'bottom'],
+      'text-radial-offset': 0.9,
+      'text-justify': 'auto',
+      'symbol-sort-key': ['match', ['get', 'type'], 'bts', 0, 1],
     },
     paint: { 'text-color': '#14213d', 'text-halo-color': 'rgba(255,255,255,0.95)', 'text-halo-width': 1.6 },
   });
