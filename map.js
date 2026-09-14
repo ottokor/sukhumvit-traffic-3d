@@ -248,6 +248,17 @@ map.on('load', () => {
   map.resize();
   lockZoom();
   map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.35, position: [1.15, 210, 30] });
+  // Sky above the horizon + a light haze toward it, so the tilted view doesn't end in a flat
+  // slab. `fog-color` matches the page background so the horizon blends into the panel chrome.
+  map.setSky({
+    'sky-color': '#7fb8e0',
+    'sky-horizon-blend': 0.6,
+    'horizon-color': '#f2e4cf',
+    'horizon-fog-blend': 0.6,
+    'fog-color': '#dfe7ee',
+    'fog-ground-blend': 0.55,
+    'atmosphere-blend': 0.6,
+  });
   // The basemap only extrudes buildings from zoom 14; the building data exists from 13.
   if (map.getLayer('building-3d')) map.setLayerZoomRange('building-3d', 13, 24);
   addParks();
