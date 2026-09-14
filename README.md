@@ -4,8 +4,9 @@ A single-page site showing live traffic on Bangkok's Sukhumvit corridor, **Nana 
 on a 3D map with building extrusions, the BTS stations, and Benjakitti and Benjasiri parks highlighted.
 Visitors can rotate and tilt only. It runs at zero cost.
 
-**Live at https://ottokor.github.io/sukhumvit-traffic-3d/** (GitHub Pages, redeployed on every push to
-`main`). Vercel remains the intended long-term host; see *Deploy* below.
+**Live at https://www.ottokorpela.com/bangkoktraffic**, served by the site's Vercel project through
+rewrites to this repo's own Vercel project (`sukhumvit-traffic-3d.vercel.app`), which redeploys on every
+push to `main`. See *Deploy* below.
 
 It is also a practice ground for **agent-driven development on GitHub**: label an issue `agent` and a
 Claude pipeline implements it, reviews its own work, fixes what the reviewer flags, and hands you a PR.
@@ -85,20 +86,19 @@ Terms yourself and, if in doubt, ask TomTom whether a 5-minute proxy cache is ac
 tier.** If not, the fallback is to let each visitor fetch tiles from TomTom directly, which reintroduces
 the quota problem the cache was built to avoid.
 
-## Deploy
+## Deploy (Vercel)
 
-### GitHub Pages (current)
-`.github/workflows/deploy-pages.yml` publishes the repository root to
-https://ottokor.github.io/sukhumvit-traffic-3d/ on every push to `main`. Pages has no rewrites, so on
-`*.github.io` the frontend reads the `traffic-data` branch directly from raw.githubusercontent.com,
-which sends `Access-Control-Allow-Origin: *`. That CDN caches each file for up to five minutes, so the
-"last updated" time can lag a refresh by that much on Pages; the stale warning only appears after 15.
+Two Vercel projects, both under the same account:
 
-### Vercel (planned)
-1. Vercel dashboard → *Add New Project* → import `ottokor/sukhumvit-traffic-3d`.
-2. Framework preset **Other**, no build command, output directory `.` (root). `vercel.json` handles the
-   `/traffic` rewrite.
-3. Deploy. Later, attach a subdomain of ottokorpela.com from the project's Domains tab.
+1. **This repo → its own project.** Vercel dashboard → *Add New* → *Project* → import
+   `ottokor/sukhumvit-traffic-3d`. Framework preset **Other**, no build command, output directory `.`
+   (root). Deploy. Every push to `main` redeploys, so merged agent PRs go live on their own.
+   `vercel.json` rewrites `/traffic/*` to the `traffic-data` branch on raw.githubusercontent.com, whose
+   CDN caches each file for up to five minutes.
+2. **ottokorpela.com → mounts it at `/bangkoktraffic`.** `next.config.ts` in the site repo has three
+   rewrites: `/bangkoktraffic` and `/bangkoktraffic/*` proxy to `sukhumvit-traffic-3d.vercel.app`, and
+   `/bangkoktraffic/traffic/*` goes straight to the data branch. `index.html` sets a `<base>` tag when
+   served at a path without a trailing slash, so relative asset URLs resolve under `/bangkoktraffic/`.
 
 Nothing in the frontend needs an environment variable. The TomTom key lives only in GitHub Actions.
 
