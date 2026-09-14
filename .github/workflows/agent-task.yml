@@ -94,7 +94,8 @@ jobs:
             jq -r '.question // ""' <<<"$OUT" > .agent/impl_question.md
             jq -r '.tests_run // ""' <<<"$OUT" > .agent/impl_tests.md
           fi
-          git add -A -n -- . ':!.agent' | grep -q . && echo "changed=true" >> "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
+          # .agent/ is gitignored, so a plain status check ignores it.
+          if [ -n "$(git status --porcelain)" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
           git status --short
 
       - name: Ask the human (implementer needs a decision)
@@ -127,7 +128,7 @@ jobs:
         if: steps.impl.outputs.status == 'done' && steps.impl.outputs.changed == 'true'
         run: |
           TITLE=$(gh issue view "$ISSUE" --json title -q .title)
-          git add -A -- . ':!.agent'
+          git add -A
           git commit -q -m "Implement #${ISSUE}: ${TITLE}" -m "$(cat .agent/impl_summary.md)" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
           git push -u origin "$BRANCH"
 
@@ -227,8 +228,8 @@ jobs:
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           jq -r '.summary // ""' <<<"${OUT:-{}}" > .agent/fix_summary.md 2>/dev/null || true
           jq -r '.question // ""' <<<"${OUT:-{}}" > .agent/fix_question.md 2>/dev/null || true
-          if git add -A -n -- . ':!.agent' | grep -q .; then
-            git add -A -- . ':!.agent'
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
             git commit -q -m "Address review findings for #${ISSUE}" -m "$(cat .agent/fix_summary.md)" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
             git push origin "$BRANCH"
             echo "changed=true" >> "$GITHUB_OUTPUT"
