@@ -1,8 +1,13 @@
 name: Refresh traffic tiles
 
-# GitHub's shortest schedule is every 5 minutes, and runs are often a few minutes late.
-# Each run fetches the fixed tile set from TomTom and force-pushes it as a single
-# commit to the `traffic-data` branch, so the repository history never grows.
+# Fetches the fixed tile set from TomTom and force-pushes it as a single commit to the
+# `traffic-data` branch, so repository history never grows.
+#
+# Scheduling: GitHub's cron is the primary trigger but is often late and, for new repositories,
+# sometimes does not fire for hours. When the repository variable REFRESH_KEEPALIVE is "true",
+# each run also re-dispatches itself about five minutes after it started, so refreshes keep
+# coming regardless. A run skips the TomTom fetch if the published data is under four minutes
+# old, so overlapping cron + keep-alive runs never exceed the request budget.
 on:
   schedule:
     - cron: '*/5 * * * *'
@@ -10,16 +15,20 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: refresh-traffic
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 9
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -37,8 +46,22 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Fetch tiles from TomTom
+      - name: Skip if the published data is under 4 minutes old
+        id: fresh
         if: steps.key.outputs.present == 'true'
+        run: |
+          LAST=$(gh api "repos/$GITHUB_REPOSITORY/contents/traffic/updated.json?ref=traffic-data" -q .content 2>/dev/null | base64 -d 2>/dev/null | jq -r '.updated // empty' || true)
+          if [ -n "$LAST" ]; then
+            AGE=$(( $(date +%s) - $(date -d "$LAST" +%s) ))
+            echo "Last refresh $LAST ($AGE s ago)"
+            if [ "$AGE" -lt 240 ]; then echo "fresh=true" >> "$GITHUB_OUTPUT"; echo "Skipping fetch."; exit 0; fi
+          fi
+          echo "fresh=false" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch tiles from TomTom
+        id: fetch
+        if: steps.key.outputs.present == 'true' && steps.fresh.outputs.fresh != 'true'
+        continue-on-error: true
         env:
           TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
           OUT_DIR: out/traffic
@@ -46,9 +69,7 @@ jobs:
         run: node scripts/refresh-traffic.mjs
 
       - name: Publish to the traffic-data branch
-        if: steps.key.outputs.present == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: steps.fetch.outcome == 'success'
         run: |
           cd out
           git init -q -b traffic-data
@@ -56,5 +77,17 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -q -m "traffic tiles $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" traffic-data
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" traffic-data
           echo "Published $(find traffic -name '*.png' | wc -l) tiles to traffic-data"
+
+      - name: Report a failed fetch
+        if: steps.fetch.outcome == 'failure'
+        run: echo "::warning::TomTom fetch failed this round; the site keeps the previous tiles. See the step log above."
+
+      - name: Keep-alive — re-dispatch this workflow ~5 minutes after it started
+        if: always() && steps.key.outputs.present == 'true' && vars.REFRESH_KEEPALIVE == 'true'
+        run: |
+          WAIT=$(( START + 300 - $(date +%s) ))
+          [ "$WAIT" -gt 0 ] && echo "Sleeping ${WAIT}s before re-dispatch" && sleep "$WAIT"
+          gh workflow run refresh-traffic.yml --ref "${GITHUB_REF_NAME}"
+          echo "Re-dispatched. Set repository variable REFRESH_KEEPALIVE to false to stop the chain."

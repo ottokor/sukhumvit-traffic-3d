@@ -67,7 +67,12 @@ every 5 min → 43,776 requests/day  (TomTom free tier: 50,000)
 ```
 
 `npm run tiles` prints this, `npm test` fails if it goes over. GitHub's shortest schedule is 5 minutes
-and runs are often a few minutes late, so the real number is lower. Failed tiles are retried up to
+and runs are often late; for new repositories the cron sometimes does not fire for hours. So the job
+is also self-sustaining: while the repository variable `REFRESH_KEEPALIVE` is `true`, each run
+re-dispatches itself about five minutes after it started, and any run skips the TomTom fetch when the
+published data is under four minutes old, so cron and keep-alive together never exceed the budget.
+Set the variable to `false` (Settings → Secrets and variables → Actions → Variables) to rely on cron
+alone; run the workflow once by hand to restart the chain. Failed tiles are retried up to
 three times, which counts against the budget; if you ever see 429s, drop `padding` to 0 for z16 in
 `corridor.js` (~33k/day) or change the cron to `*/6`.
 
