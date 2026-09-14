@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   review:
-    if: ${{ !github.event.pull_request.draft && !startsWith(github.head_ref, 'agent/') }}
+    # Review only the owner's own pull requests; PRs from forks get no secrets anyway.
+    if: ${{ github.actor == github.repository_owner && !github.event.pull_request.draft && !startsWith(github.head_ref, 'agent/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

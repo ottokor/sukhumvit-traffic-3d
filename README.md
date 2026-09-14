@@ -176,6 +176,14 @@ Labels the pipeline uses: `agent` (start), `agent-working`, `agent-done`, `needs
 - **`ci.yml`** – syntax check, unit tests, tile budget, and a grep that fails if the frontend ever
   references TomTom or a key. Runs on PRs and pushes to `main`.
 
+### Who can trigger the Claude workflows
+The Claude token is a personal subscription credential, so every workflow that uses it is gated
+with `github.actor == github.repository_owner`: only the owner's issues, labels, comments and pull
+requests start Claude. Outsiders can still open issues and PRs on this public repository, but the
+jobs skip before any step runs, and GitHub never exposes secrets to pull requests from forks. The
+token itself exists only as an Actions secret; it is never in the frontend, `vercel.json`, or git
+history, and `.vercelignore` keeps workflow files and scripts out of the deployed site.
+
 ### Limits worth knowing
 - Pushes made with `GITHUB_TOKEN` do not trigger other workflows, so the pipeline runs the tests itself
   and dispatches CI on the branch explicitly. Installing the Claude GitHub App

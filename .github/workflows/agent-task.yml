@@ -28,10 +28,15 @@ concurrency:
 
 jobs:
   pipeline:
+    # Only the repository owner may start the agent (and so spend the Claude subscription).
+    # The action also refuses actors without write access, but this skips the job outright,
+    # so an outsider opening an issue with the template gets no comments and no run.
     if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'agent') ||
-      (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent'))
+      github.actor == github.repository_owner && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.action == 'labeled' && github.event.label.name == 'agent') ||
+        (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent'))
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:

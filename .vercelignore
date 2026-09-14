@@ -1,0 +1,10 @@
+# Only the files the browser needs are deployed. Everything here stays in the repo but is
+# not served from the site.
+.github
+.claude
+tests
+scripts/refresh-traffic.mjs
+scripts/dev-server.mjs
+*.md
+package.json
+.gitignore
