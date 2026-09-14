@@ -4,9 +4,13 @@ import { CORRIDOR } from './corridor.js';
 import { tileAlignedBounds } from './scripts/tiles.mjs';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
-// Served by our own cache (Vercel rewrite / dev server), never by TomTom directly.
-const TRAFFIC_TILES = '/traffic/{z}/{x}/{y}.png';
-const UPDATED_URL = '/traffic/updated.json';
+// Traffic tiles come from our own cache (the traffic-data branch), never from TomTom directly.
+// On Vercel and the dev server, /traffic/* is rewritten to that branch. GitHub Pages has no
+// rewrites, so there we read the branch directly; raw.githubusercontent.com allows CORS.
+const RAW_TRAFFIC_BASE = 'https://raw.githubusercontent.com/ottokor/sukhumvit-traffic-3d/traffic-data/traffic';
+const TRAFFIC_BASE = location.hostname.endsWith('github.io') ? RAW_TRAFFIC_BASE : '/traffic';
+const TRAFFIC_TILES = `${TRAFFIC_BASE}/{z}/{x}/{y}.png`;
+const UPDATED_URL = `${TRAFFIC_BASE}/updated.json`;
 const POLL_MS = 60_000;
 const STALE_MS = 15 * 60_000;
 const FONT = ['Noto Sans Bold'];
