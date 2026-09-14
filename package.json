@@ -1,0 +1,14 @@
+{
+  "name": "sukhumvit-traffic-3d",
+  "private": true,
+  "version": "0.1.0",
+  "description": "3D live-traffic map of Bangkok's Sukhumvit corridor, Nana BTS to Ekkamai BTS.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "test": "node --test tests/",
+    "tiles": "node scripts/refresh-traffic.mjs --dry-run",
+    "refresh": "node scripts/refresh-traffic.mjs"
+  }
+}

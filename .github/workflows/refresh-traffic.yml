@@ -1,0 +1,60 @@
+name: Refresh traffic tiles
+
+# GitHub's shortest schedule is every 5 minutes, and runs are often a few minutes late.
+# Each run fetches the fixed tile set from TomTom and force-pushes it as a single
+# commit to the `traffic-data` branch, so the repository history never grows.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-traffic
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the TomTom key is configured
+        id: key
+        env:
+          TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+        run: |
+          if [ -z "$TOMTOM_API_KEY" ]; then
+            echo "::warning::TOMTOM_API_KEY secret is not set — skipping. Add it under Settings → Secrets and variables → Actions."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch tiles from TomTom
+        if: steps.key.outputs.present == 'true'
+        env:
+          TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+          OUT_DIR: out/traffic
+          REFRESH_INTERVAL_MINUTES: 5
+        run: node scripts/refresh-traffic.mjs
+
+      - name: Publish to the traffic-data branch
+        if: steps.key.outputs.present == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd out
+          git init -q -b traffic-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "traffic tiles $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" traffic-data
+          echo "Published $(find traffic -name '*.png' | wc -l) tiles to traffic-data"

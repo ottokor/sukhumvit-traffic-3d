@@ -1,0 +1,10 @@
+node_modules
+.env
+.env.*
+.vercel
+.DS_Store
+# Traffic tiles are published to the traffic-data branch, never committed on main.
+public/traffic/
+out/
+# Scratch files exchanged between agent steps in CI.
+.agent/

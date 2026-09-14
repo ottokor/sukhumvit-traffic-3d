@@ -1,0 +1,312 @@
+name: Agent task
+
+# The agent pipeline. Add the `agent` label to an issue and, in one run:
+#   implement (Claude) → commit + open PR (workflow) → review (Claude) → fix (Claude, if asked)
+#   → re-review (Claude) → hand the PR to the human with a clear label.
+# Claude only stops to ask you when the brief is genuinely ambiguous; otherwise it decides,
+# states the assumption in the PR, and the reviewer checks it.
+on:
+  issues:
+    types: [labeled, opened]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number to implement
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+  id-token: write
+
+concurrency:
+  group: agent-task-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'agent') ||
+      (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      ISSUE: ${{ github.event.issue.number || inputs.issue }}
+      BRANCH: agent/issue-${{ github.event.issue.number || inputs.issue }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prepare branch and tell the issue
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+            git merge --no-edit origin/main || { git merge --abort; echo "::warning::Could not merge main into $BRANCH"; }
+          else
+            git checkout -b "$BRANCH"
+          fi
+          gh issue edit "$ISSUE" --remove-label agent --remove-label needs-human --add-label agent-working 2>/dev/null || true
+          gh issue comment "$ISSUE" --body "🤖 Agent pipeline started — implement → review → hand-off. Follow along: $RUN_URL"
+
+      # ---------------------------------------------------------------- implement
+      - name: Implement
+        id: implement
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are the implementer agent. Read .github/agents/implementer.md and CLAUDE.md first and follow them exactly.
+            Task: implement GitHub issue #${{ env.ISSUE }} in ${{ github.repository }}.
+            Read it with `gh issue view ${{ env.ISSUE }} --comments` — the human may have answered an earlier question in the comments.
+            You are on branch ${{ env.BRANCH }}. Only edit files in the working tree; do NOT run git commit/push and do NOT open a PR — the workflow does that after you return.
+            Finish by returning the structured result described in implementer.md.
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(gh issue view:*),Bash(node:*),Bash(npm test:*),Bash(npm run:*),Bash(ls:*),Bash(cat:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*)"
+            --json-schema '{"type":"object","properties":{"status":{"type":"string","enum":["done","needs_human","failed"]},"summary":{"type":"string"},"question":{"type":"string"},"tests_run":{"type":"string"}},"required":["status","summary"]}'
+
+      - name: Read implementer result
+        id: impl
+        env:
+          OUT: ${{ steps.implement.outputs.structured_output }}
+        run: |
+          mkdir -p .agent
+          if [ -z "$OUT" ] || ! jq -e . >/dev/null 2>&1 <<<"$OUT"; then
+            echo "status=failed" >> "$GITHUB_OUTPUT"
+            echo "The implementer returned no structured result." > .agent/impl_summary.md
+          else
+            echo "status=$(jq -r '.status' <<<"$OUT")" >> "$GITHUB_OUTPUT"
+            jq -r '.summary' <<<"$OUT" > .agent/impl_summary.md
+            jq -r '.question // ""' <<<"$OUT" > .agent/impl_question.md
+            jq -r '.tests_run // ""' <<<"$OUT" > .agent/impl_tests.md
+          fi
+          git add -A -n -- . ':!.agent' | grep -q . && echo "changed=true" >> "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
+          git status --short
+
+      - name: Ask the human (implementer needs a decision)
+        if: steps.impl.outputs.status == 'needs_human'
+        run: |
+          gh issue edit "$ISSUE" --add-label needs-human --remove-label agent-working 2>/dev/null || true
+          {
+            echo "🙋 **The agent needs your decision before building this.**"
+            echo
+            cat .agent/impl_question.md
+            echo
+            echo "---"
+            echo "_Answer in a comment, then add the \`agent\` label again to restart the pipeline._"
+          } | gh issue comment "$ISSUE" --body-file -
+
+      - name: Nothing to change
+        if: steps.impl.outputs.status == 'done' && steps.impl.outputs.changed == 'false'
+        run: |
+          gh issue edit "$ISSUE" --add-label needs-human --remove-label agent-working 2>/dev/null || true
+          {
+            echo "🤔 **The agent finished without changing any files.** Its summary:"
+            echo
+            cat .agent/impl_summary.md
+            echo
+            echo "_If this is wrong, clarify the issue and add the \`agent\` label again._"
+          } | gh issue comment "$ISSUE" --body-file -
+
+      # ------------------------------------------------------------ commit + PR
+      - name: Commit and push
+        if: steps.impl.outputs.status == 'done' && steps.impl.outputs.changed == 'true'
+        run: |
+          TITLE=$(gh issue view "$ISSUE" --json title -q .title)
+          git add -A -- . ':!.agent'
+          git commit -q -m "Implement #${ISSUE}: ${TITLE}" -m "$(cat .agent/impl_summary.md)" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
+          git push -u origin "$BRANCH"
+
+      - name: Open or update the pull request
+        id: pr
+        if: steps.impl.outputs.status == 'done' && steps.impl.outputs.changed == 'true'
+        run: |
+          NUMBER=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+          TITLE=$(gh issue view "$ISSUE" --json title -q .title)
+          {
+            echo "Closes #${ISSUE}"
+            echo
+            echo "## What the agent did"
+            cat .agent/impl_summary.md
+            echo
+            if [ -s .agent/impl_tests.md ]; then echo "## Tests the implementer ran"; cat .agent/impl_tests.md; echo; fi
+            echo "_Built by the agent pipeline ($RUN_URL). The review pass is posted as a comment below._"
+          } > .agent/pr_body.md
+          if [ -z "$NUMBER" ]; then
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file .agent/pr_body.md
+            NUMBER=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+          else
+            gh pr edit "$NUMBER" --body-file .agent/pr_body.md
+          fi
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Run the test suite
+        id: test
+        if: steps.pr.outputs.number != ''
+        continue-on-error: true
+        run: npm test 2>&1 | tee .agent/test.log
+
+      # -------------------------------------------------------------------- review
+      - name: Review
+        id: review
+        if: steps.pr.outputs.number != ''
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are the reviewer agent. Read .github/agents/reviewer.md and CLAUDE.md and follow them.
+            Review pull request #${{ steps.pr.outputs.number }} for issue #${{ env.ISSUE }} in ${{ github.repository }}.
+            The PR branch is checked out. See the change with `git diff origin/main...HEAD`, the requirements with
+            `gh issue view ${{ env.ISSUE }} --comments`, and the test result of this workflow's own run in .agent/test.log
+            (outcome: ${{ steps.test.outcome }}). You may run `npm test` and `npm run tiles` yourself.
+            Do not edit files and do not post comments; return only the structured verdict.
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(gh issue view:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(node:*),Bash(npm test:*),Bash(npm run:*)"
+            --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","request_changes","needs_human"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","properties":{"severity":{"type":"string","enum":["blocker","major","minor","nit"]},"file":{"type":"string"},"description":{"type":"string"},"fix":{"type":"string"}},"required":["severity","description"]}},"question":{"type":"string"}},"required":["verdict","summary","findings"]}'
+
+      - name: Post the review
+        id: rev
+        if: steps.pr.outputs.number != ''
+        env:
+          OUT: ${{ steps.review.outputs.structured_output }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          if [ -z "$OUT" ] || ! jq -e . >/dev/null 2>&1 <<<"$OUT"; then
+            echo "verdict=needs_human" >> "$GITHUB_OUTPUT"
+            echo '{"verdict":"needs_human","summary":"The reviewer agent returned no structured result.","findings":[],"question":"Please review this PR yourself."}' > .agent/review.json
+          else
+            printf '%s' "$OUT" > .agent/review.json
+            echo "verdict=$(jq -r '.verdict' <<<"$OUT")" >> "$GITHUB_OUTPUT"
+          fi
+          bash .github/agents/format-review.sh .agent/review.json "Review pass 1" > .agent/review.md
+          gh pr comment "$PR" --body-file .agent/review.md
+
+      # ------------------------------------------------------------- fix (one round)
+      - name: Fix the findings
+        id: fixer
+        if: steps.rev.outputs.verdict == 'request_changes'
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are the fixer agent. Read .github/agents/fixer.md and CLAUDE.md and follow them.
+            The reviewer's findings for pull request #${{ steps.pr.outputs.number }} (issue #${{ env.ISSUE }}) are in .agent/review.json.
+            Resolve them on the checked-out branch. Only edit files; do NOT run git commit/push.
+            Return the structured result described in fixer.md.
+          claude_args: |
+            --max-turns 60
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(gh issue view:*),Bash(node:*),Bash(npm test:*),Bash(npm run:*),Bash(git diff:*),Bash(git status:*)"
+            --json-schema '{"type":"object","properties":{"status":{"type":"string","enum":["done","needs_human","failed"]},"summary":{"type":"string"},"question":{"type":"string"}},"required":["status","summary"]}'
+
+      - name: Commit the fix
+        id: fixcommit
+        if: steps.rev.outputs.verdict == 'request_changes'
+        env:
+          OUT: ${{ steps.fixer.outputs.structured_output }}
+        run: |
+          STATUS=$(jq -r '.status // "failed"' <<<"${OUT:-{}}" 2>/dev/null || echo failed)
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          jq -r '.summary // ""' <<<"${OUT:-{}}" > .agent/fix_summary.md 2>/dev/null || true
+          jq -r '.question // ""' <<<"${OUT:-{}}" > .agent/fix_question.md 2>/dev/null || true
+          if git add -A -n -- . ':!.agent' | grep -q .; then
+            git add -A -- . ':!.agent'
+            git commit -q -m "Address review findings for #${ISSUE}" -m "$(cat .agent/fix_summary.md)" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
+            git push origin "$BRANCH"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Re-review
+        id: review2
+        if: steps.fixcommit.outputs.changed == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are the reviewer agent. Read .github/agents/reviewer.md and CLAUDE.md and follow them.
+            This is the second pass on pull request #${{ steps.pr.outputs.number }} for issue #${{ env.ISSUE }}.
+            Your first-pass findings are in .agent/review.json; the fixer's summary is in .agent/fix_summary.md.
+            Check with `git diff origin/main...HEAD` that each blocker/major finding is resolved and nothing regressed. Run `npm test`.
+            Do not edit files and do not post comments; return only the structured verdict.
+            There will be no further fix round: return `approve` if the PR is safe for the human to merge,
+            otherwise `needs_human` with a short `question` explaining what still needs a human.
+          claude_args: |
+            --max-turns 30
+            --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(gh issue view:*),Bash(gh pr view:*),Bash(node:*),Bash(npm test:*),Bash(npm run:*)"
+            --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","request_changes","needs_human"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","properties":{"severity":{"type":"string","enum":["blocker","major","minor","nit"]},"file":{"type":"string"},"description":{"type":"string"},"fix":{"type":"string"}},"required":["severity","description"]}},"question":{"type":"string"}},"required":["verdict","summary","findings"]}'
+
+      - name: Post the second review
+        id: rev2
+        if: steps.fixcommit.outputs.changed == 'true'
+        env:
+          OUT: ${{ steps.review2.outputs.structured_output }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          if [ -z "$OUT" ] || ! jq -e . >/dev/null 2>&1 <<<"$OUT"; then
+            echo '{"verdict":"needs_human","summary":"The reviewer agent returned no structured result on the second pass.","findings":[],"question":"Please review this PR yourself."}' > .agent/review2.json
+          else
+            printf '%s' "$OUT" > .agent/review2.json
+          fi
+          echo "verdict=$(jq -r '.verdict' .agent/review2.json)" >> "$GITHUB_OUTPUT"
+          bash .github/agents/format-review.sh .agent/review2.json "Review pass 2 (after fixes)" > .agent/review2.md
+          gh pr comment "$PR" --body-file .agent/review2.md
+
+      # ---------------------------------------------------------------- hand-off
+      - name: Hand the PR to the human
+        if: steps.pr.outputs.number != ''
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+          V1: ${{ steps.rev.outputs.verdict }}
+          V2: ${{ steps.rev2.outputs.verdict }}
+          FIX: ${{ steps.fixcommit.outputs.status }}
+        run: |
+          FINAL="${V2:-$V1}"
+          if [ "$V1" = "request_changes" ] && [ -z "$V2" ]; then FINAL="needs_human"; fi   # fixer changed nothing / failed
+          if [ "$FINAL" = "request_changes" ]; then FINAL="needs_human"; fi                 # no more automatic rounds
+          echo "Final verdict: $FINAL"
+          gh workflow run ci.yml --ref "$BRANCH" 2>/dev/null || true
+          gh issue edit "$ISSUE" --remove-label agent-working --add-label agent-done 2>/dev/null || true
+          PR_URL=$(gh pr view "$PR" --json url -q .url)
+          if [ "$FINAL" = "approve" ]; then
+            gh pr edit "$PR" --add-label ready-for-human 2>/dev/null || true
+            gh issue comment "$ISSUE" --body "✅ **Ready for you.** The agent built and reviewed it; nothing needs a decision. Approve and merge when you're happy: $PR_URL"
+          else
+            gh pr edit "$PR" --add-label needs-human 2>/dev/null || true
+            Q=$(jq -r '.question // ""' .agent/review2.json 2>/dev/null || jq -r '.question // ""' .agent/review.json)
+            [ -z "$Q" ] && Q=$(cat .agent/fix_question.md 2>/dev/null || true)
+            {
+              echo "🙋 **Your input is needed on the PR:** $PR_URL"
+              echo
+              [ -n "$Q" ] && echo "$Q"
+              echo
+              echo "_The review comments on the PR list what is still open. Reply there with \`@claude\` to have it fixed, or push a commit yourself._"
+            } | gh issue comment "$ISSUE" --body-file -
+          fi
+
+      - name: Report a pipeline failure
+        if: failure()
+        run: |
+          gh issue edit "$ISSUE" --remove-label agent-working --add-label needs-human 2>/dev/null || true
+          gh issue comment "$ISSUE" --body "⚠️ The agent pipeline failed before finishing. Check the run log: $RUN_URL — most often this means a missing \`ANTHROPIC_API_KEY\`/\`CLAUDE_CODE_OAUTH_TOKEN\` secret. Add the \`agent\` label again to retry."

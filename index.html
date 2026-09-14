@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sukhumvit live traffic — Nana to Ekkamai in 3D</title>
+<meta name="description" content="Live traffic on Bangkok's Sukhumvit corridor between Nana and Ekkamai BTS, on a 3D map you can rotate and tilt.">
+<meta name="theme-color" content="#dfe7ee">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map" role="application" aria-label="3D map of Sukhumvit Road between Nana and Ekkamai. Drag to rotate, drag up or down to tilt. Arrow keys also work."></div>
+
+<aside class="panel" aria-label="Map information">
+  <header>
+    <h1>Sukhumvit live traffic</h1>
+    <p class="sub">Nana BTS → Ekkamai BTS · Bangkok</p>
+  </header>
+  <ul class="legend" aria-label="Traffic speed compared with free flow">
+    <li><i style="--c:#3cb44b"></i>Free flow</li>
+    <li><i style="--c:#f5c531"></i>Slow</li>
+    <li><i style="--c:#e8552d"></i>Heavy</li>
+    <li><i style="--c:#8b1a1a"></i>Standstill</li>
+  </ul>
+  <p class="status" id="status" aria-live="polite">Loading traffic…</p>
+  <div class="actions">
+    <button id="reset" type="button">Reset view</button>
+    <span class="hint">Drag to rotate · drag up/down to tilt</span>
+  </div>
+</aside>
+
+<noscript><p class="noscript">This map needs JavaScript.</p></noscript>
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script type="module" src="map.js"></script>
+</body>
+</html>

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filter coffee — the whole brew, animated</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bean:#22140E;--roast:#3A241A;--wood:#4A2E20;--crema:#F1E3CF;--milk:#FBF7EF;--copper:#D08A3C;--brew:#6B3E22;--water:#5B93BF}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bean);color:var(--crema);font-family:"Source Sans 3",system-ui,sans-serif;font-size:17px;line-height:1.45}
+  .display{font-family:"Fraunces",Georgia,serif;font-variation-settings:"SOFT" 60,"opsz" 96}
+  .app{display:grid;grid-template-rows:auto 1fr auto;min-height:100vh}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 26px 6px}
+  header h1{font-weight:400;font-size:clamp(1.5rem,3vw,2.2rem);margin:0;letter-spacing:-.01em}
+  header .caption{color:var(--copper);font-size:1.05rem;min-height:1.5em;transition:opacity .3s}
+
+  /* scene */
+  .scene{position:relative;overflow:hidden;background:radial-gradient(120% 90% at 50% 10%,#4A2E20 0%,#2B1A12 55%,#22140E 100%)}
+  .scene svg{width:100%;height:auto;display:block;max-height:64vh}
+  #world{transition:transform 1.4s cubic-bezier(.65,0,.25,1);transform-origin:0 0}
+
+  /* meters float over the scene */
+  .meters{position:absolute;right:22px;top:18px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .meter{background:rgba(34,20,14,.75);backdrop-filter:blur(6px);border:1px solid rgba(241,227,207,.15);border-radius:10px;padding:8px 14px;min-width:190px;opacity:0;transform:translateX(12px);transition:.5s}
+  .meter.on{opacity:1;transform:none}
+  .meter .v{font-family:"Fraunces",serif;font-variation-settings:"SOFT" 60;font-size:1.7rem;font-weight:300;line-height:1;color:var(--milk)}
+  .meter .v small{font-family:"Source Sans 3",sans-serif;font-size:.85rem;color:var(--copper);margin-left:5px}
+  .meter .l{font-size:.85rem;color:rgba(241,227,207,.7)}
+  .stagebar{position:absolute;left:22px;bottom:16px;display:flex;gap:6px}
+  .stagebar span{padding:6px 12px;border-radius:999px;background:rgba(0,0,0,.35);color:rgba(241,227,207,.55);font-size:.9rem;transition:.4s}
+  .stagebar span.on{background:var(--copper);color:var(--bean)}
+  .stagebar span.done{color:var(--crema)}
+
+  /* controls */
+  .controls{padding:18px 26px 26px;display:grid;grid-template-columns:auto 1fr auto;gap:22px;align-items:center;background:#1A0F0A;border-top:1px solid rgba(241,227,207,.08)}
+  @media(max-width:900px){.controls{grid-template-columns:1fr}}
+  .cuppick{display:flex;flex-direction:column;gap:6px}
+  .cuppick .row{display:flex;gap:5px}
+  .cupbtn{width:34px;height:36px;border:0;background:transparent;padding:0;cursor:pointer;opacity:.35;transition:opacity .15s,transform .15s}
+  .cupbtn svg{width:100%;height:100%;display:block}
+  .cupbtn.on{opacity:1}
+  .cupbtn:hover{transform:translateY(-2px)}
+  .cupbtn:focus-visible{outline:2px solid var(--copper);border-radius:6px}
+  .cuppick .lbl{font-size:.9rem;color:rgba(241,227,207,.7)}
+  .cuppick .lbl b{color:var(--milk);font-weight:600}
+  .opts{display:flex;flex-wrap:wrap;gap:14px 22px}
+  .opt{display:flex;flex-direction:column;gap:5px}
+  .opt .lbl{font-size:.85rem;color:rgba(241,227,207,.65)}
+  .seg{display:flex;background:rgba(241,227,207,.06);border-radius:9px;padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;color:rgba(241,227,207,.75);font:inherit;font-size:.92rem;padding:6px 11px;border-radius:7px;cursor:pointer;transition:.15s}
+  .seg button.on{background:var(--copper);color:var(--bean);font-weight:600}
+  .seg button:focus-visible{outline:2px solid var(--copper)}
+  .beans{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:.92rem;color:rgba(241,227,207,.8)}
+  .beans input{font:inherit;width:82px;background:rgba(241,227,207,.06);border:1px solid rgba(241,227,207,.25);border-radius:7px;color:var(--milk);padding:5px 8px;margin-right:4px}
+  .beans input:focus-visible{outline:2px solid var(--copper)}
+  .beans span{color:var(--copper)}
+  .go{font:inherit;font-weight:600;font-size:1.05rem;background:var(--copper);color:var(--bean);border:0;border-radius:12px;padding:16px 26px;cursor:pointer;white-space:nowrap;transition:.2s}
+  .go:hover{background:#E19B4C}.go[disabled]{opacity:.6;cursor:progress}
+
+  /* summary card shown at end */
+  .summary{position:absolute;inset:0;display:grid;place-items:center;background:rgba(34,20,14,.55);opacity:0;pointer-events:none;transition:opacity .6s}
+  .summary.on{opacity:1;pointer-events:auto}
+  .summary .card{background:#F1E3CF;color:#22140E;border-radius:16px;padding:26px 32px;max-width:520px;width:calc(100% - 40px);box-shadow:0 30px 60px rgba(0,0,0,.5)}
+  .summary h2{font-weight:400;font-size:1.8rem;margin:0 0 10px}
+  .summary .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin:14px 0}
+  .summary .grid .v{font-family:"Fraunces",serif;font-size:2rem;font-weight:300;line-height:1}
+  .summary .grid .v small{font-family:"Source Sans 3";font-size:.9rem;color:#A9642A;margin-left:4px}
+  .summary .grid .l{font-size:.9rem;color:#5C3B2A}
+  .summary p{font-size:.92rem;color:#5C3B2A;margin:6px 0 14px}
+  .summary button{font:inherit;background:#22140E;color:var(--crema);border:0;border-radius:9px;padding:10px 18px;cursor:pointer}
+
+  /* animation classes */
+  .burr{transform-origin:118px 116px}
+  .grinding .burr{animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .bean{opacity:0}.grinding .bean{animation:drop 1.1s linear infinite}
+  @keyframes drop{0%{opacity:0;transform:translateY(-10px)}20%{opacity:1}100%{opacity:0;transform:translateY(30px)}}
+  .steam{opacity:0}.heating .steam,.brewing .steam{animation:rise 2.2s ease-out infinite}
+  @keyframes rise{0%{opacity:0;transform:translateY(0)}30%{opacity:.75}100%{opacity:0;transform:translateY(-40px) scaleX(1.5)}}
+  .element{opacity:.3}.heating .element{animation:glow .8s ease-in-out infinite alternate}
+  @keyframes glow{from{opacity:.5}to{opacity:1}}
+  .stream{opacity:0;transition:opacity .4s}.brewing .stream{opacity:1}
+  .heating #powerled,.brewing #powerled,.serving #powerled{fill:#FF6A3D}
+  .brewing #hotplate,.serving #hotplate{opacity:.9;transition:opacity .6s}
+  .drip{opacity:0}.brewing .drip{animation:drip .8s linear infinite}
+  @keyframes drip{0%{opacity:0;transform:translateY(0)}15%{opacity:1}100%{opacity:0;transform:translateY(58px)}}
+  #carafeG{transition:transform 1.1s ease-in-out;transform-origin:540px 340px}
+  .serving #carafeG{transform:translate(110px,-30px) rotate(-55deg)}
+  .pour{opacity:0;transition:opacity .3s}.serving .pour{opacity:1}
+  .milkjug{transition:transform .8s ease-in-out;transform-origin:660px 300px}
+  .serving.milk .milkjug{transform:translate(-30px,-50px) rotate(40deg)}
+  .milkstream{opacity:0;transition:opacity .3s}.serving.milk .milkstream{opacity:1}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01s!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1 class="display">Filter coffee, start to finish</h1>
+    <div class="caption" id="caption">Pick your cups below, then start the brew.</div>
+  </header>
+
+  <div class="scene" id="scene">
+    <svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Animated brewing scene">
+      <defs>
+        <clipPath id="carafeClip"><path d="M440 200 L424 328 Q424 340 436 340 L538 340 Q550 340 550 328 L534 200 Z"/></clipPath>
+        <clipPath id="tankClip"><rect x="302" y="82" width="36" height="156"/></clipPath>
+        <linearGradient id="glass" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".14"/><stop offset=".5" stop-color="#fff" stop-opacity=".02"/><stop offset="1" stop-color="#fff" stop-opacity=".16"/></linearGradient>
+        <linearGradient id="counter" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#5A3A29"/><stop offset="1" stop-color="#2C1A12"/></linearGradient>
+      </defs>
+      <g id="world">
+        <!-- counter -->
+        <rect x="0" y="352" width="760" height="68" fill="url(#counter)"/>
+        <rect x="0" y="348" width="760" height="6" fill="#6B4632"/>
+
+        <!-- GRINDER x~118 -->
+        <g id="grinder">
+          <ellipse cx="118" cy="66" rx="32" ry="10" fill="#2A1912"/>
+          <path d="M84 62 L152 62 L140 102 L96 102 Z" fill="#5C3B2A"/>
+          <g fill="#3A241A">
+            <ellipse class="bean" cx="110" cy="72" rx="4" ry="6"/>
+            <ellipse class="bean" cx="124" cy="68" rx="4" ry="6" style="animation-delay:.4s"/>
+            <ellipse class="bean" cx="118" cy="76" rx="4" ry="6" style="animation-delay:.75s"/>
+          </g>
+          <rect x="96" y="102" width="44" height="30" rx="3" fill="#7A4E36"/>
+          <circle class="burr" cx="118" cy="116" r="11" fill="#2A1912" stroke="#D08A3C" stroke-width="2.5" stroke-dasharray="4 5"/>
+          <rect x="86" y="132" width="64" height="58" rx="6" fill="#4A2E20"/>
+          <rect x="96" y="190" width="44" height="34" rx="3" fill="#2A1912" stroke="#7A4E36"/>
+          <g clip-path="url(#none)"><rect id="grounds" x="98" y="222" width="40" height="30" fill="#5C3B2A" style="transform:scaleY(0);transform-origin:118px 222px"/></g>
+          <text x="118" y="245" fill="rgba(241,227,207,.55)" font-size="12" text-anchor="middle">grinder</text>
+        </g>
+
+        <!-- FILTER COFFEE MACHINE x~360 -->
+        <g id="machine">
+          <!-- back tower: water tank -->
+          <rect x="250" y="60" width="150" height="292" rx="10" fill="#2E2E33"/>
+          <rect x="258" y="66" width="134" height="280" rx="8" fill="#3B3B41"/>
+          <rect x="262" y="52" width="126" height="16" rx="6" fill="#2E2E33"/>
+          <!-- tank window with water level -->
+          <rect x="300" y="80" width="40" height="160" rx="6" fill="#1B1B1F" stroke="rgba(241,227,207,.2)"/>
+          <g clip-path="url(#tankClip)"><rect id="waterlvl" x="302" y="82" width="36" height="156" fill="var(--water)" opacity=".8" style="transform:translateY(156px);transition:transform 1.2s"/></g>
+          <g stroke="rgba(241,227,207,.35)" stroke-width="1"><path d="M340 100 h6"/><path d="M340 130 h6"/><path d="M340 160 h6"/><path d="M340 190 h6"/><path d="M340 220 h6"/></g>
+          <text x="352" y="104" fill="rgba(241,227,207,.5)" font-size="9">12</text>
+          <text x="352" y="164" fill="rgba(241,227,207,.5)" font-size="9">6</text>
+          <text x="352" y="224" fill="rgba(241,227,207,.5)" font-size="9">2</text>
+          <!-- heating element in the base -->
+          <rect class="element" x="266" y="332" width="118" height="6" rx="3" fill="#FF6A3D"/>
+          <!-- steam from the basket lid -->
+          <g stroke="rgba(241,227,207,.75)" stroke-width="3" fill="none" stroke-linecap="round">
+            <path class="steam" d="M470 96 q10 -12 0 -24"/>
+            <path class="steam" d="M486 100 q10 -12 0 -24" style="animation-delay:.7s"/>
+            <path class="steam" d="M502 96 q10 -12 0 -24" style="animation-delay:1.4s"/>
+          </g>
+          <!-- head unit over the basket -->
+          <rect x="392" y="60" width="180" height="40" rx="10" fill="#2E2E33"/>
+          <rect x="400" y="66" width="164" height="28" rx="8" fill="#3B3B41"/>
+          <!-- shower head + water stream -->
+          <rect x="450" y="100" width="60" height="8" rx="3" fill="#8A8A92"/>
+          <g class="stream" stroke="var(--water)" stroke-width="3" stroke-linecap="round">
+            <path d="M462 108 v14"/><path d="M480 108 v16"/><path d="M498 108 v14"/>
+          </g>
+          <!-- filter basket -->
+          <path d="M424 124 L536 124 L500 196 L460 196 Z" fill="#2E2E33"/>
+          <path d="M432 130 L528 130 L496 188 L464 188 Z" fill="#E9D9B6"/>
+          <path d="M438 132 L522 132 L494 178 L466 178 Z" fill="#5C3B2A"/>
+          <path d="M442 132 L518 132 L492 150 L468 150 Z" fill="#7A4E36"/>
+          <!-- drips out of the basket -->
+          <g fill="#6B3E22">
+            <rect class="drip" x="478" y="196" width="4" height="12" rx="2"/>
+            <rect class="drip" x="486" y="196" width="3" height="10" rx="2" style="animation-delay:.28s"/>
+            <rect class="drip" x="470" y="196" width="3" height="10" rx="2" style="animation-delay:.55s"/>
+          </g>
+          <!-- hot plate -->
+          <rect x="412" y="340" width="150" height="12" rx="4" fill="#2E2E33"/>
+          <rect id="hotplate" x="420" y="342" width="134" height="6" rx="3" fill="#FF6A3D" opacity=".2"/>
+          <!-- switch + light -->
+          <rect x="272" y="288" width="26" height="14" rx="7" fill="#1B1B1F"/>
+          <circle id="powerled" cx="279" cy="295" r="4" fill="#5A5A60"/>
+          <text x="310" y="299" fill="rgba(241,227,207,.6)" font-size="10">brew</text>
+          <!-- thermometer readout on the tower -->
+          <rect x="270" y="250" width="110" height="26" rx="5" fill="#1B1B1F"/>
+          <text id="tempTxt" x="325" y="268" fill="var(--crema)" font-size="14" text-anchor="middle" font-family="Fraunces">25°</text>
+          <rect x="270" y="280" width="110" height="4" rx="2" fill="#2E2E33"/>
+          <rect id="temp" x="270" y="280" width="110" height="4" rx="2" fill="#FF6A3D" style="transform:scaleX(.15);transform-origin:270px 282px;transition:transform 1s"/>
+          <!-- carafe on the plate -->
+          <g id="carafeG">
+            <g clip-path="url(#carafeClip)"><rect id="liquid" x="410" y="190" width="140" height="170" fill="var(--brew)" style="transform:translateY(170px);transition:transform 1s"/></g>
+            <path d="M440 200 L424 328 Q424 340 436 340 L538 340 Q550 340 550 328 L534 200 Z" fill="url(#glass)" stroke="rgba(241,227,207,.55)" stroke-width="2"/>
+            <rect x="432" y="196" width="110" height="10" rx="4" fill="#1B1B1F"/>
+            <path d="M540 214 q40 20 0 96" stroke="#1B1B1F" stroke-width="10" fill="none" stroke-linecap="round"/>
+            <path class="pour" d="M432 206 q -6 30 -14 80" stroke="var(--brew)" stroke-width="6" fill="none" stroke-linecap="round"/>
+          </g>
+          <text x="410" y="378" fill="rgba(241,227,207,.55)" font-size="12" text-anchor="middle">filter coffee machine</text>
+        </g>
+
+        <!-- MILK JUG x~660 -->
+        <g class="milkjug" id="milkjug">
+          <path d="M636 250 L684 250 L678 348 L642 348 Z" fill="#DDE3E8"/>
+          <path d="M642 262 L678 262 L673 342 L647 342 Z" fill="#FBF7EF"/>
+          <path d="M684 262 q22 10 10 44" stroke="#DDE3E8" stroke-width="7" fill="none" stroke-linecap="round"/>
+          <path d="M636 250 l-8 -10 h18 z" fill="#DDE3E8"/>
+          <path class="milkstream" d="M630 244 q-4 40 -10 100" stroke="#FBF7EF" stroke-width="5" fill="none" stroke-linecap="round"/>
+        </g>
+        <text id="jugLbl" x="660" y="378" fill="rgba(241,227,207,.55)" font-size="12" text-anchor="middle">milk</text>
+
+        <!-- CUPS: drawn by JS around x~640 -->
+        <g id="cups"></g>
+      </g>
+    </svg>
+
+    <div class="meters">
+      <div class="meter" id="mBeans"><div class="v">0<small>g beans</small></div><div class="l">ground so far</div></div>
+      <div class="meter" id="mCost"><div class="v">0<small>THB beans</small></div><div class="l">bean cost so far</div></div>
+      <div class="meter" id="mWater"><div class="v">0<small>L water</small></div><div class="l">heating</div></div>
+      <div class="meter" id="mKwh"><div class="v">0.000<small>kWh</small></div><div class="l">electricity used</div></div>
+      <div class="meter" id="mCaf"><div class="v">0<small>mg caffeine</small></div><div class="l">poured so far</div></div>
+      <div class="meter" id="mKcal"><div class="v">0<small>kcal</small></div><div class="l">calories poured</div></div>
+    </div>
+    <div class="stagebar" id="stagebar"><span>Grind</span><span>Fill and heat</span><span>Brew</span><span>Serve</span></div>
+
+    <div class="summary" id="summary">
+      <div class="card">
+        <h2 class="display" id="sumTitle">Batch ready</h2>
+        <div class="grid" id="sumGrid"></div>
+        <p id="sumNote"></p>
+        <button id="again">Brew another batch</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="cuppick">
+      <div class="lbl">Tap the cups you want — <b id="cupCount">4 cups</b></div>
+      <div class="row" id="cupRow1"></div>
+      <div class="row" id="cupRow2"></div>
+    </div>
+    <div class="opts">
+      <div class="opt"><div class="lbl">Size</div><div class="seg" data-key="size">
+        <button data-v="236">Short</button><button data-v="354" class="on">Tall</button><button data-v="473">Grande</button><button data-v="591">Venti</button></div></div>
+      <div class="opt"><div class="lbl">Milk</div><div class="seg" data-key="milk">
+        <button data-v="none" class="on">None</button><button data-v="soy">Soya</button><button data-v="oat">Oat</button><button data-v="whole">Whole</button></div></div>
+      <div class="opt"><div class="lbl">Milk per cup</div><div class="seg" data-key="milkAmt">
+        <button data-v="30" class="on">Splash</button><button data-v="60">Generous</button><button data-v="100">Latte-style</button></div></div>
+      <div class="opt"><div class="lbl">Sugar</div><div class="seg" data-key="sugar">
+        <button data-v="0" class="on">0</button><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></div></div>
+      <div class="opt"><div class="lbl">Keep warm after</div><div class="seg" data-key="hold">
+        <button data-v="0" class="on">No</button><button data-v="15">15 min</button><button data-v="30">30 min</button><button data-v="60">1 h</button></div></div>
+      <div class="opt"><div class="lbl">Your coffee beans</div><div class="beans">
+        <label><input type="number" id="packPrice" value="450" min="0" step="10" inputmode="decimal"> THB per pack</label>
+        <label><input type="number" id="packWeight" value="250" min="1" step="10" inputmode="numeric"> g per pack</label>
+        <span id="perG"></span></div></div>
+    </div>
+    <button class="go" id="go">Start the brew</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const NS='http://www.w3.org/2000/svg';
+  const $=id=>document.getElementById(id);
+  const f=(n,d)=>n.toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const el=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;};
+  const state={cups:4,size:354,milk:'none',milkAmt:30,sugar:0,hold:0,packPrice:450,packWeight:250};
+  const milkKcal={none:0,soy:54,oat:46,whole:64};
+  const milkRGB={soy:[0xD9,0xC9,0xA6],oat:[0xCD,0xBB,0x94],whole:[0xF1,0xE6,0xD4]};
+  let running=false;
+
+  /* ---------- cup picker (HTML buttons) ---------- */
+  const cupIcon=()=>'<svg viewBox="0 0 34 36"><path d="M4 6 L8 32 L26 32 L30 6 Z" fill="#F1E3CF"/><path d="M2 4 H32" stroke="#F1E3CF" stroke-width="4" stroke-linecap="round"/><path d="M29 12 q8 4 0 16" stroke="#F1E3CF" stroke-width="3" fill="none"/></svg>';
+  for(let i=1;i<=12;i++){
+    const b=document.createElement('button');b.className='cupbtn';b.type='button';b.setAttribute('aria-label',i+' cups');b.innerHTML=cupIcon();
+    b.addEventListener('click',()=>{state.cups=i;paintCups();drawCups(0);});
+    (i<=6?$('cupRow1'):$('cupRow2')).appendChild(b);
+  }
+  function paintCups(){[...document.querySelectorAll('.cupbtn')].forEach((b,i)=>b.classList.toggle('on',i<state.cups));$('cupCount').textContent=state.cups+(state.cups===1?' cup':' cups');}
+  paintCups();
+
+  /* ---------- segmented options ---------- */
+  document.querySelectorAll('.seg').forEach(seg=>{
+    const key=seg.dataset.key;
+    seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+      seg.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+      const v=b.dataset.v;state[key]=isNaN(+v)?v:+v;$('jugLbl').textContent=state.milk==='none'?'':state.milk+' milk';$('milkjug').style.opacity=state.milk==='none'?.25:1;drawCups(0);
+    }));
+  });
+
+  ['packPrice','packWeight'].forEach(id=>$(id).addEventListener('input',()=>{state[id]=Math.max(0,+$(id).value||0);perG();}));
+  function perG(){const c=calc();$('perG').textContent=c.pricePerG?`= ${f(c.pricePerG,2)} THB per gram`:'';}
+
+  /* ---------- maths ---------- */
+  function calc(){
+    const o=state;
+    const coffeeMl=o.size-(o.milk==='none'?0:o.milkAmt);
+    const kcalCup=coffeeMl*0.02+(o.milk==='none'?0:o.milkAmt*milkKcal[o.milk]/100)+o.sugar*16;
+    const waterL=coffeeMl*o.cups/1000;
+    const heat=(waterL*4.18*(94-25))/3600/0.9;
+    const grind=150*10*o.cups/3600/1000;
+    const hold=60*o.hold*60/3600/1000;
+    const standby=3*1200/3600/1000;
+    const caffeineCup=coffeeMl*0.45,beansG=waterL*60,pricePerG=o.packWeight>0?o.packPrice/o.packWeight:0,beanCost=beansG*pricePerG;
+    return {coffeeMl,caffeineCup,caffeineTotal:caffeineCup*o.cups,kcalCup,kcalTotal:kcalCup*o.cups,waterL,beansG,pricePerG,beanCost,heat,grind,hold,standby,kwh:heat+grind+hold+standby};
+  }
+
+  /* ---------- cups in the SVG scene ---------- */
+  const cupData=[];
+  function drawCups(filledCount){
+    const g=$('cups');while(g.firstChild)g.removeChild(g.firstChild);cupData.length=0;
+    const n=state.cups,cols=Math.min(6,n),rows=n>6?2:1;
+    const cw=Math.min(36,156/cols),gap=6,scale=.55+state.size/591*.5,ch=cw*1.2*scale;
+    const startX=640-(cols*(cw+gap)-gap)/2;
+    for(let i=0;i<n;i++){
+      const row=Math.floor(i/6),col=i%6;
+      const x=startX+col*(cw+gap),y=346-ch-(rows-1-row)*(ch+8);
+      const grp=el('g',{class:'cup'},g);
+      const clip=el('clipPath',{id:'cc'+i},el('defs',{},grp));
+      el('path',{d:`M${x+3} ${y+6} L${x+6} ${y+ch} L${x+cw-6} ${y+ch} L${x+cw-3} ${y+6} Z`},clip);
+      const liq=el('rect',{x,y,width:cw,height:ch,fill:cupColor(),'clip-path':`url(#cc${i})`},grp);
+      liq.style.transform=`translateY(${i<filledCount?0:ch}px)`;liq.style.transition='transform .7s ease-out';
+      el('path',{d:`M${x+2} ${y+4} L${x+6} ${y+ch} L${x+cw-6} ${y+ch} L${x+cw-2} ${y+4} Z`,fill:'rgba(241,227,207,.10)',stroke:'#E9D9B6','stroke-width':2},grp);
+      el('path',{d:`M${x} ${y+2} L${x+cw} ${y+2}`,stroke:'#E9D9B6','stroke-width':3,'stroke-linecap':'round'},grp);
+      cupData.push({liq,ch});
+    }
+  }
+  function cupColor(){
+    if(state.milk==='none')return '#6B3E22';
+    const t=Math.min(.7,state.milkAmt/state.size*1.6),a=[0x6B,0x3E,0x22],b=milkRGB[state.milk];
+    return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*t).toString(16).padStart(2,'0')).join('');
+  }
+  drawCups(0);$('milkjug').style.opacity=.25;
+
+  /* ---------- helpers ---------- */
+  const scene=$('scene'),world=$('world'),cap=$('caption');
+  const stages=[...$('stagebar').children];
+  function camera(x,y,s){world.style.transform=`scale(${s}) translate(${-x}px,${-y}px)`;}
+  function phase(cls){scene.className='scene '+cls+(state.milk!=='none'?' milk':'');}
+  function stage(i){stages.forEach((s,k)=>{s.classList.toggle('on',k===i);s.classList.toggle('done',k<i);});}
+  function meter(id,on,v,unit){const m=$(id);m.classList.toggle('on',on);if(v!==undefined)m.querySelector('.v').innerHTML=v+'<small>'+unit+'</small>';}
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  function tween(ms,fn){return new Promise(res=>{const t0=performance.now();(function f(t){const p=Math.min(1,(t-t0)/ms);fn(p);p<1?requestAnimationFrame(f):res();})(t0);});}
+  perG();
+  function reset(){
+    phase('');stage(-1);camera(0,0,1);['mBeans','mCost','mWater','mKwh','mCaf','mKcal'].forEach(id=>meter(id,false));
+    $('grounds').style.transform='scaleY(0)';$('waterlvl').style.transform='translateY(156px)';$('temp').style.transform='scaleX(.15)';$('tempTxt').textContent='25°';
+    $('liquid').style.transform='translateY(170px)';$('summary').classList.remove('on');drawCups(0);
+  }
+
+  /* ---------- the brew sequence ---------- */
+  async function brew(){
+    if(running)return;running=true;const r=calc();const btn=$('go');btn.disabled=true;btn.textContent='Brewing…';
+    reset();let kwh=0;
+    /* 1 grind */
+    stage(0);camera(20,20,1.7);cap.textContent=`Grinding ${f(r.beansG,0)} g of beans (${f(r.beanCost,2)} THB) for ${state.cups} ${state.cups===1?'cup':'cups'}.`;await wait(900);
+    phase('grinding');meter('mBeans',true,'0','g beans');meter('mCost',true,'0','THB beans');meter('mKwh',true,'0.000','kWh');
+    await tween(1600+state.cups*120,p=>{$('grounds').style.transform=`scaleY(${p})`;meter('mBeans',true,f(r.beansG*p,0),'g beans');meter('mCost',true,f(r.beanCost*p,2),'THB beans');meter('mKwh',true,f(r.grind*p,3),'kWh');});
+    kwh=r.grind;phase('');await wait(500);
+    /* 2 heat */
+    stage(1);camera(210,20,1.6);cap.textContent=`Filling the tank with ${f(r.waterL,2)} L and heating it from 25 °C to 94 °C inside the machine — this is where most of the electricity goes.`;await wait(1000);
+    $('waterlvl').style.transform=`translateY(${156*(1-Math.min(1,r.waterL/1.8))}px)`;meter('mWater',true,f(r.waterL,2),'L water');await wait(1000);
+    phase('heating');
+    await tween(2400,p=>{const T=25+69*p;$('temp').style.transform=`scaleX(${.15+.85*p})`;$('tempTxt').textContent=Math.round(T)+'°';meter('mKwh',true,f(kwh+r.heat*p,3),'kWh');});
+    kwh+=r.heat;phase('');await wait(400);
+    /* 3 brew */
+    stage(2);camera(300,30,1.5);cap.textContent='Hot water showers over the grounds and drips through the paper filter into the carafe on the hot plate.';await wait(1000);
+    phase('brewing');const lvl=170*(1-Math.min(1,r.waterL/1.8));$('liquid').style.transitionDuration=(2.2+state.cups*.25)+'s';$('liquid').style.transform=`translateY(${lvl}px)`;
+    await wait(2400+state.cups*250);phase('');
+    /* 4 serve */
+    stage(3);camera(390,90,1.4);cap.textContent=state.milk==='none'?`Pouring black coffee into the cups — about ${f(r.caffeineCup,0)} mg of caffeine each.`:`Pouring, then a ${state.milkAmt} ml ${state.milk==='soy'?'soya':state.milk} milk ${state.milkAmt>=100?'top-up':'splash'} in each cup.`;await wait(1000);
+    phase('serving');$('liquid').style.transitionDuration='1s';$('liquid').style.transform='translateY(170px)';meter('mKcal',true,'0','kcal');meter('mCaf',true,'0','mg caffeine');
+    for(let i=0;i<cupData.length;i++){cupData[i].liq.style.transform='translateY(0)';meter('mKcal',true,f(r.kcalCup*(i+1),0),'kcal');meter('mCaf',true,f(r.caffeineCup*(i+1),0),'mg caffeine');await wait(Math.max(180,600-state.cups*35));}
+    if(state.hold){cap.textContent=`Kept warm on the hot plate for ${state.hold} minutes.`;await tween(1400,p=>meter('mKwh',true,f(kwh+r.hold*p,3),'kWh'));kwh+=r.hold;}
+    kwh+=r.standby;meter('mKwh',true,f(kwh,3),'kWh');await wait(700);phase('');
+    /* 5 summary */
+    stage(4);camera(0,0,1);cap.textContent='Done.';await wait(900);
+    $('sumTitle').textContent=`${state.cups} ${state.cups===1?'cup':'cups'} of filter coffee, ready`;
+    $('sumGrid').innerHTML=[
+      [f(r.kcalCup,0),'kcal','per cup'],[f(r.kcalTotal,0),'kcal','whole batch'],
+      [f(r.caffeineCup,0),'mg','caffeine per cup'],[f(r.caffeineTotal,0),'mg','caffeine in the batch'],
+      [f(kwh,3),'kWh','electricity'],[f(kwh*4.2,2),'THB','electricity at 4.2 THB/kWh'],
+      [f(r.beanCost,2),'THB','beans for the batch'],[f((r.beanCost+kwh*4.2)/state.cups,2),'THB','beans + power per cup']
+    ].map(([v,u,l])=>`<div><div class="v">${v}<small>${u}</small></div><div class="l">${l}</div></div>`).join('');
+    $('sumNote').textContent=`${f(r.waterL,2)} L water, ${f(r.beansG,0)} g coffee at ${f(r.pricePerG,2)} THB/g (${state.packPrice} THB per ${state.packWeight} g pack). Heating the water is ${f(r.heat/kwh*100,0)} % of the electricity`+(state.hold?`; the hot plate is ${f(r.hold/kwh*100,0)} %.`:'.')+` Caffeine estimated at 45 mg per 100 ml of brewed filter coffee; ${Math.floor(400/r.caffeineCup)} ${Math.floor(400/r.caffeineCup)===1?'cup keeps':'cups keep'} one adult under the common 400 mg-a-day guideline. Figures are estimates: 2 kcal/100 ml black coffee, soya 54, oat 46, whole 64 kcal/100 ml, 16 kcal per sugar sachet; 90 % efficient heater, 150 W grinder, 60 W hot plate.`;
+    $('summary').classList.add('on');
+    btn.disabled=false;btn.textContent='Brew again';running=false;
+  }
+  $('go').addEventListener('click',brew);
+  $('again').addEventListener('click',()=>{reset();cap.textContent='Pick your cups below, then start the brew.';window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});});
+})();
+</script>
+</body>
+</html>

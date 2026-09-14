@@ -1,0 +1,85 @@
+:root {
+  color-scheme: light;
+  --ink: #14213d;
+  --muted: #5b6478;
+  --card: rgba(255, 255, 255, 0.88);
+  --accent: #1f7a3a;
+}
+* { box-sizing: border-box; }
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: #dfe7ee;
+}
+#map { position: fixed; inset: 0; }
+/* Our own orbit handler needs raw pointer events on touch devices. */
+#map .maplibregl-canvas-container, #map canvas { touch-action: none; }
+
+.panel {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 14px 16px;
+  background: var(--card);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(20, 33, 61, 0.18);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.panel h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -0.01em; }
+.sub { margin: 2px 0 10px; color: var(--muted); }
+
+.legend {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+.legend li { display: flex; align-items: center; gap: 8px; }
+.legend i { width: 22px; height: 8px; border-radius: 4px; background: var(--c); flex: none; }
+
+.status { margin: 0 0 10px; color: var(--muted); }
+.status.stale { color: #a63d1f; }
+.status.live::before {
+  content: "";
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #3cb44b;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(20, 33, 61, 0.15);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+button:hover { background: #f3f6f9; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { color: var(--muted); font-size: 12.5px; }
+.noscript { position: fixed; inset: 0; display: grid; place-items: center; }
+
+@media (max-width: 600px) {
+  .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; padding: 12px 14px; }
+  .panel h1 { font-size: 16px; }
+  .hint { display: none; }
+  .legend { grid-template-columns: repeat(4, auto); justify-content: start; gap: 4px 10px; font-size: 12px; }
+  .legend i { width: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/traffic/:path*",
+      "destination": "https://raw.githubusercontent.com/ottokor/sukhumvit-traffic-3d/traffic-data/traffic/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/traffic/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=60, stale-while-revalidate=120" }]
+    }
+  ]
+}

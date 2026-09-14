@@ -1,0 +1,43 @@
+name: Agent task
+description: Brief the agent pipeline. It implements, reviews itself, and hands you a PR — asking only if the brief is ambiguous.
+title: "[agent] "
+labels: ["agent"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write this like a brief to a careful colleague. Submitting starts the pipeline: implement → review → fix → hand-off.
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be different when this is done? One or two sentences.
+      placeholder: Add a soft sky gradient behind the 3D buildings so the horizon does not look flat.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Bullet points the reviewer agent will check.
+      placeholder: |
+        - Sky visible at the default pitch on desktop and phone
+        - Camera lock unchanged (no zoom, no pan)
+        - Respects prefers-reduced-motion
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and out of scope
+      description: Anything the agent must not touch or should not attempt.
+  - type: dropdown
+    id: ambiguity
+    attributes:
+      label: If something is ambiguous
+      options:
+        - Make a sensible call and tell me in the PR
+        - Stop and ask me first
+      default: 0
+    validations:
+      required: true
