@@ -1,0 +1,26 @@
+name: Claude auth check
+
+# Manual smoke test: runs Claude with a one-word prompt and no tools, using ONLY the OAuth
+# token, with full output visible so an authentication error is readable in the log.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: true
+          prompt: Reply with exactly the single word OK and nothing else.
+          claude_args: |
+            --max-turns 1
+            --allowedTools ""
