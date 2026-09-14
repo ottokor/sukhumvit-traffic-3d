@@ -10,6 +10,14 @@
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
 <!-- Critical sizing inline so the map container has its size before MapLibre constructs. -->
 <style>html,body{height:100%;margin:0}#map{position:fixed;inset:0}</style>
+<script>
+  // This page is also proxied at a path with no trailing slash (ottokorpela.com/bangkoktraffic).
+  // There, relative URLs like "style.css" would resolve to the site root, so declare the base.
+  (function () {
+    var p = location.pathname;
+    if (!p.endsWith('/') && !/\.[a-z0-9]+$/i.test(p)) document.write('<base href="' + p + '/">');
+  })();
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
