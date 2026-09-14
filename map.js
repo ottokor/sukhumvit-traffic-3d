@@ -46,15 +46,27 @@ map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-right'
 // --- Camera lock -----------------------------------------------------------
 let lockedZoom = null;
 let lockedCenter = CORRIDOR.center;
+let lastSize = '';
+
+const isPortrait = () => {
+  const c = map.getContainer();
+  return c.clientHeight > c.clientWidth;
+};
+const homeBearing = () => (isPortrait() ? CORRIDOR.bearingPortrait : CORRIDOR.bearing);
 
 // Fit the corridor to this viewport once, then pin that zoom (minZoom === maxZoom).
+// No-op when the container size has not changed, so spurious resize events never
+// interrupt an animation or a drag.
 function lockZoom() {
+  const c = map.getContainer();
+  const size = `${c.clientWidth}x${c.clientHeight}`;
+  if (size === lastSize) return;
+  lastSize = size;
   const prev = { bearing: map.getBearing(), pitch: map.getPitch() };
   map.setMinZoom(0);
   map.setMaxZoom(24);
-  map.jumpTo({ bearing: 0, pitch: 0 });
-  const cam = map.cameraForBounds(BOUNDS, { padding: 12 });
-  lockedZoom = cam.zoom;
+  const cam = map.cameraForBounds(BOUNDS, { padding: 12, bearing: homeBearing(), pitch: 0 });
+  lockedZoom = Math.max(CORRIDOR.minLockedZoom, cam.zoom);
   lockedCenter = cam.center;
   map.setMinZoom(lockedZoom);
   map.setMaxZoom(lockedZoom);
@@ -62,7 +74,7 @@ function lockZoom() {
 }
 
 function resetView(animate = !reduceMotion) {
-  const target = { center: lockedCenter, zoom: lockedZoom, bearing: CORRIDOR.bearing, pitch: CORRIDOR.pitch };
+  const target = { center: lockedCenter, zoom: lockedZoom, bearing: homeBearing(), pitch: CORRIDOR.pitch };
   if (animate) map.easeTo({ ...target, duration: 900 });
   else map.jumpTo(target);
 }
@@ -177,8 +189,9 @@ function addPois() {
       'text-field': ['get', 'label'],
       'text-font': FONT,
       'text-size': 12.5,
-      'text-offset': [0, 0.9],
-      'text-anchor': 'top',
+      // Stations label below their dot, parks to the left, so Benjasiri and Phrom Phong don't collide.
+      'text-offset': ['match', ['get', 'type'], 'park', ['literal', [-0.8, 0]], ['literal', [0, 0.9]]],
+      'text-anchor': ['match', ['get', 'type'], 'park', 'right', 'top'],
       'text-allow-overlap': true,
       'text-ignore-placement': true,
     },
@@ -229,8 +242,13 @@ map.on('error', (e) => {
 });
 
 map.on('load', () => {
+  // If the container was laid out after construction, MapLibre may still be at its
+  // 400×300 fallback size; resize() is idempotent and cheap.
+  map.resize();
   lockZoom();
   map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.35, position: [1.15, 210, 30] });
+  // The basemap only extrudes buildings from zoom 14; the building data exists from 13.
+  if (map.getLayer('building-3d')) map.setLayerZoomRange('building-3d', 13, 24);
   addParks();
   addTraffic();
   addPois();
@@ -239,8 +257,8 @@ map.on('load', () => {
   if (reduceMotion) {
     resetView(false);
   } else {
-    map.jumpTo({ bearing: CORRIDOR.bearing - 25, pitch: 35 });
-    map.easeTo({ bearing: CORRIDOR.bearing, pitch: CORRIDOR.pitch, duration: 2200 });
+    map.jumpTo({ bearing: homeBearing() - 25, pitch: 35 });
+    map.easeTo({ bearing: homeBearing(), pitch: CORRIDOR.pitch, duration: 2200 });
   }
 
   pollUpdated();
@@ -249,3 +267,6 @@ map.on('load', () => {
 });
 
 resetBtn.addEventListener('click', () => resetView());
+
+// Handy for debugging in the browser console.
+window.__map = map;

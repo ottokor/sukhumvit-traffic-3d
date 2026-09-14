@@ -8,9 +8,15 @@ export const CORRIDOR = {
   center: [100.571, 13.7315],
 
   // Camera the visitor starts from and returns to with "Reset view".
+  // Sukhumvit runs at a compass bearing of ~125°, so bearing 20 lays the corridor
+  // roughly horizontal on a landscape screen and 125 lays it vertical on a phone.
   pitch: 58,
   bearing: 20,
+  bearingPortrait: 125,
   pitchRange: [30, 72],
+  // The zoom is fitted to the viewport but never below this (MapLibre zoom, 512 px
+  // tiles): below 14 the basemap has no building extrusions and we fetch no traffic.
+  minLockedZoom: 14,
 
   // TomTom raster tiles are 256 px, so MapLibre asks for zoom+1 tiles:
   // desktop (map zoom ~15) uses z16, phones (map zoom ~14) use z15.

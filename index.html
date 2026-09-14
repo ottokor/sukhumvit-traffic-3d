@@ -7,6 +7,8 @@
 <meta name="description" content="Live traffic on Bangkok's Sukhumvit corridor between Nana and Ekkamai BTS, on a 3D map you can rotate and tilt.">
 <meta name="theme-color" content="#dfe7ee">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
+<!-- Critical sizing inline so the map container has its size before MapLibre constructs. -->
+<style>html,body{height:100%;margin:0}#map{position:fixed;inset:0}</style>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>

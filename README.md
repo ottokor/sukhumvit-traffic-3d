@@ -73,8 +73,9 @@ The frontend shows "Traffic updated HH:MM Bangkok time" from `updated.json` and 
 ### TomTom terms on caching (checked 2026-09-14)
 TomTom's tile responses carry `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate`,
 and the Traffic API documentation contains no clause permitting server-side storage of flow tiles. The
-public terms page on `docs.tomtom.com/legal` is a redirect shell and I could not read a caching clause
-either way. Treat this cache as what it is: a short-lived proxy that re-fetches every 5 minutes and keeps
+public terms page on `docs.tomtom.com/legal` renders only through JavaScript and I could not read a
+caching clause either way; a search summary mentions a 60-day retention limit for downloadable
+Traffic Analytics content, which is a different product and unverified. Treat this cache as what it is: a short-lived proxy that re-fetches every 5 minutes and keeps
 a single current copy (no history), which is the usual reading of a "no-store" header for a
 rate-limited proxy. **Before pointing a real audience at the site, read the current TomTom Developer
 Terms yourself and, if in doubt, ask TomTom whether a 5-minute proxy cache is acceptable on the free
