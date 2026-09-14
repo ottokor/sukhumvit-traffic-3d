@@ -17,9 +17,12 @@ permissions:
   contents: write
   actions: write
 
+# One run at a time. A newly dispatched run waits for the current one to finish (it is the
+# last thing the current run does), and GitHub keeps at most one pending run per group, so a
+# cron run arriving on top of the keep-alive chain replaces the pending one instead of piling up.
 concurrency:
   group: refresh-traffic
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   refresh:
