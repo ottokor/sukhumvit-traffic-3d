@@ -4,6 +4,9 @@ A single-page site showing live traffic on Bangkok's Sukhumvit corridor, **Nana 
 on a 3D map with building extrusions, the BTS stations, and Benjakitti and Benjasiri parks highlighted.
 Visitors can rotate and tilt only. It runs at zero cost.
 
+**Live at https://ottokor.github.io/sukhumvit-traffic-3d/** (GitHub Pages, redeployed on every push to
+`main`). Vercel remains the intended long-term host; see *Deploy* below.
+
 It is also a practice ground for **agent-driven development on GitHub**: label an issue `agent` and a
 Claude pipeline implements it, reviews its own work, fixes what the reviewer flags, and hands you a PR.
 It asks for your view only when the brief is genuinely ambiguous.
@@ -82,7 +85,16 @@ Terms yourself and, if in doubt, ask TomTom whether a 5-minute proxy cache is ac
 tier.** If not, the fallback is to let each visitor fetch tiles from TomTom directly, which reintroduces
 the quota problem the cache was built to avoid.
 
-## Deploy (Vercel)
+## Deploy
+
+### GitHub Pages (current)
+`.github/workflows/deploy-pages.yml` publishes the repository root to
+https://ottokor.github.io/sukhumvit-traffic-3d/ on every push to `main`. Pages has no rewrites, so on
+`*.github.io` the frontend reads the `traffic-data` branch directly from raw.githubusercontent.com,
+which sends `Access-Control-Allow-Origin: *`. That CDN caches each file for up to five minutes, so the
+"last updated" time can lag a refresh by that much on Pages; the stale warning only appears after 15.
+
+### Vercel (planned)
 1. Vercel dashboard → *Add New Project* → import `ottokor/sukhumvit-traffic-3d`.
 2. Framework preset **Other**, no build command, output directory `.` (root). `vercel.json` handles the
    `/traffic` rewrite.
