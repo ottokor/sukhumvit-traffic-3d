@@ -173,7 +173,7 @@ function addTraffic() {
 function addPois() {
   const features = CORRIDOR.pois.map((p) => ({
     type: 'Feature',
-    properties: { label: p.label, type: p.type },
+    properties: { label: p.label, labelTh: p.labelTh, type: p.type },
     geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
   }));
   map.addSource('pois', { type: 'geojson', data: { type: 'FeatureCollection', features } });
@@ -189,7 +189,9 @@ function addPois() {
   map.addLayer({
     id: 'poi-label', type: 'symbol', source: 'pois',
     layout: {
-      'text-field': ['get', 'label'],
+      // English name, then the Thai name as a smaller second line — same font as the
+      // basemap already loads, just scaled down, so no new glyph range is needed.
+      'text-field': ['format', ['get', 'label'], {}, '\n', {}, ['get', 'labelTh'], { 'font-scale': 0.78 }],
       'text-font': FONT,
       'text-size': 12.5,
       // Collision-aware placement: try below, then right/left/above, so Benjasiri Park and
