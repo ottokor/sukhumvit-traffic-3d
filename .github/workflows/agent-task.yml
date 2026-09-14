@@ -295,8 +295,12 @@ jobs:
             gh issue comment "$ISSUE" --body "✅ **Ready for you.** The agent built and reviewed it; nothing needs a decision. Approve and merge when you're happy: $PR_URL"
           else
             gh pr edit "$PR" --add-label needs-human 2>/dev/null || true
-            Q=$(jq -r '.question // ""' .agent/review2.json 2>/dev/null || jq -r '.question // ""' .agent/review.json)
+            LAST=.agent/review.json; [ -f .agent/review2.json ] && LAST=.agent/review2.json
+            clean() { jq -r "$1" "$2" 2>/dev/null | sed -E 's#</?(summary|parameter)[^>]*>##g'; }
+            Q=$(clean '.question // ""' "$LAST")
             [ -z "$Q" ] && Q=$(cat .agent/fix_question.md 2>/dev/null || true)
+            # If the reviewer put its question inside the summary, show the summary instead of nothing.
+            [ -z "$Q" ] && Q=$(clean '.summary // ""' "$LAST")
             {
               echo "🙋 **Your input is needed on the PR:** $PR_URL"
               echo

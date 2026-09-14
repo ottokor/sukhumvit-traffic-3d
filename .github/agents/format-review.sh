@@ -3,6 +3,8 @@
 # Usage: format-review.sh review.json "Heading"
 set -euo pipefail
 FILE="$1"; HEADING="${2:-Review}"
+# Strip stray markup the model occasionally leaks into string fields (e.g. "</summary>", "<parameter ...>").
+CLEAN=$(mktemp); jq 'walk(if type == "string" then gsub("</?(summary|parameter)[^>]*>"; "") else . end)' "$FILE" > "$CLEAN"; FILE="$CLEAN"
 verdict=$(jq -r '.verdict' "$FILE")
 case "$verdict" in
   approve)          badge="✅ **Verdict: approve** — safe for the human to merge" ;;
