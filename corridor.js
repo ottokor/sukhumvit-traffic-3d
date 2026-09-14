@@ -29,14 +29,15 @@ export const CORRIDOR = {
   // TomTom flow style: colours relative to free-flow speed.
   trafficStyle: 'relative0',
 
-  // Points labelled on the map.
+  // Points labelled on the map. `labelTh` is the Thai name shown as a smaller
+  // second line under `label` (map.js only reads these, never hardcodes them).
   pois: [
-    { label: 'Nana', type: 'bts', lng: 100.5554, lat: 13.7406 },
-    { label: 'Asok', type: 'bts', lng: 100.5604, lat: 13.737 },
-    { label: 'Phrom Phong', type: 'bts', lng: 100.5696, lat: 13.7305 },
-    { label: 'Thong Lo', type: 'bts', lng: 100.5786, lat: 13.7242 },
-    { label: 'Ekkamai', type: 'bts', lng: 100.5853, lat: 13.7196 },
-    { label: 'Benjasiri Park', type: 'park', lng: 100.5682, lat: 13.7302 },
-    { label: 'Benjakitti Park', type: 'park', lng: 100.559, lat: 13.7262 },
+    { label: 'Nana', labelTh: 'นานา', type: 'bts', lng: 100.5554, lat: 13.7406 },
+    { label: 'Asok', labelTh: 'อโศก', type: 'bts', lng: 100.5604, lat: 13.737 },
+    { label: 'Phrom Phong', labelTh: 'พร้อมพงษ์', type: 'bts', lng: 100.5696, lat: 13.7305 },
+    { label: 'Thong Lo', labelTh: 'ทองหล่อ', type: 'bts', lng: 100.5786, lat: 13.7242 },
+    { label: 'Ekkamai', labelTh: 'เอกมัย', type: 'bts', lng: 100.5853, lat: 13.7196 },
+    { label: 'Benjasiri Park', labelTh: 'สวนเบญจสิริ', type: 'park', lng: 100.5682, lat: 13.7302 },
+    { label: 'Benjakitti Park', labelTh: 'สวนเบญจกิติ', type: 'park', lng: 100.559, lat: 13.7262 },
   ],
 };
