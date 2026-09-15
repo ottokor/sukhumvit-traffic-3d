@@ -31,10 +31,14 @@ Visitors can rotate and tilt the view only — no zoom, no pan. Runs at zero cos
 
 ## Secrets
 - `TOMTOM_API_KEY` — never in the frontend; only in the refresh job (GitHub Actions secret).
+- `WAQI_TOKEN` — never in the frontend; only in the refresh job (GitHub Actions secret). Optional:
+  powers the air-quality overlay (`scripts/refresh-air.mjs`); without it the refresh job still
+  publishes tiles and logs a warning.
 
 ## Repo layout
 - `index.html`, `style.css`, `map.js`, `corridor.js` (single source of truth for geometry, shared with Node)
 - `scripts/tiles.mjs` — tile maths; `scripts/refresh-traffic.mjs` — tile list, budget, TomTom fetch, `updated.json`;
+  `scripts/refresh-air.mjs` — WAQI fetch, `air.json`; `scripts/aqi.mjs` — AQI band/colour mapping;
   `scripts/dev-server.mjs` — zero-dependency dev server with the production `/traffic/` behaviour
 - `tests/` — `node --test`; run with `npm test`
 - `.github/workflows/refresh-traffic.yml` — schedule; `ci.yml`; `agent-task.yml` (issue → PR pipeline);
@@ -46,5 +50,5 @@ Visitors can rotate and tilt the view only — no zoom, no pan. Runs at zero cos
 - Small commits, one feature at a time. Run `npm run dev` and check in the browser before moving on.
 - Run `npm test` and `npm run tiles` before finishing any change.
 - Ask before adding any paid service or any dependency beyond MapLibre. No build step, no framework.
-- Frontend files must never reference `api.tomtom.com` or any API key (CI greps for it).
+- Frontend files must never reference `api.tomtom.com`, `api.waqi.info`, or any API key/token (CI greps for it).
 - TomTom's caching terms: see README. Re-check before a public launch.

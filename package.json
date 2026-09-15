@@ -9,6 +9,7 @@
     "dev": "node scripts/dev-server.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
     "tiles": "node scripts/refresh-traffic.mjs --dry-run",
-    "refresh": "node scripts/refresh-traffic.mjs"
+    "refresh": "node scripts/refresh-traffic.mjs",
+    "refresh:air": "node scripts/refresh-air.mjs"
   }
 }

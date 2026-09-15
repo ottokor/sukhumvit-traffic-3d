@@ -35,6 +35,15 @@
     <li><i style="--c:#8b1a1a"></i>Standstill</li>
   </ul>
   <p class="status" id="status" aria-live="polite">Loading traffic…</p>
+  <ul class="legend" aria-label="Air quality colour scale (PM2.5 AQI)">
+    <li><i style="--c:#00e400"></i>0–50</li>
+    <li><i style="--c:#ffff00"></i>51–100</li>
+    <li><i style="--c:#ff7e00"></i>101–150</li>
+    <li><i style="--c:#ff0000"></i>151–200</li>
+    <li><i style="--c:#8f3f97"></i>201–300</li>
+    <li><i style="--c:#7e0023"></i>301+</li>
+  </ul>
+  <p class="status" id="air" aria-live="polite">No air quality data yet.</p>
   <div class="actions">
     <button id="reset" type="button">Reset view</button>
     <span class="hint">Drag to rotate · drag up/down to tilt</span>

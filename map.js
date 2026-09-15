@@ -2,6 +2,7 @@
 // The camera is locked: visitors can rotate and tilt only. No zoom, no pan.
 import { CORRIDOR } from './corridor.js';
 import { tileAlignedBounds } from './scripts/tiles.mjs';
+import { aqiBand, aqiColorExpression } from './scripts/aqi.mjs';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 // Traffic tiles come from our own cache (the traffic-data branch), never from TomTom directly.
@@ -10,6 +11,7 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const TRAFFIC_BASE = new URL('traffic', document.baseURI).pathname;
 const TRAFFIC_TILES = `${TRAFFIC_BASE}/{z}/{x}/{y}.png`;
 const UPDATED_URL = `${TRAFFIC_BASE}/updated.json`;
+const AIR_URL = `${TRAFFIC_BASE}/air.json`;
 const POLL_MS = 60_000;
 const STALE_MS = 15 * 60_000;
 const FONT = ['Noto Sans Bold'];
@@ -24,6 +26,7 @@ const finest = CORRIDOR.trafficZooms.find((t) => t.zoom === finestZoom);
 const TRAFFIC_BOUNDS = tileAlignedBounds(CORRIDOR.bounds, finest.zoom, finest.padding);
 
 const statusEl = document.getElementById('status');
+const airEl = document.getElementById('air');
 const resetBtn = document.getElementById('reset');
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -205,6 +208,34 @@ function addPois() {
   });
 }
 
+function addAir() {
+  map.addSource('air', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+    attribution: 'Air quality © <a href="https://waqi.info/" target="_blank" rel="noopener">WAQI</a>',
+  });
+  map.addLayer({
+    id: 'air-dot', type: 'circle', source: 'air',
+    paint: {
+      'circle-radius': 7,
+      'circle-color': aqiColorExpression(),
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 1.5,
+    },
+  });
+  map.addLayer({
+    id: 'air-label', type: 'symbol', source: 'air',
+    layout: {
+      'text-field': ['to-string', ['get', 'aqi']],
+      'text-font': FONT,
+      'text-size': 10,
+      // Lower priority than the BTS/park labels (sort-key 0/1 in addPois) in a collision.
+      'symbol-sort-key': 2,
+    },
+    paint: { 'text-color': '#14213d', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1 },
+  });
+}
+
 // --- Status: "last updated" from the tile timestamp file ----------------------
 let lastUpdated = null;
 
@@ -240,6 +271,51 @@ async function pollUpdated() {
   renderStatus();
 }
 
+// --- Air quality: worst-station reading polled alongside the traffic timestamp -------
+let airStations = [];
+
+function renderAir() {
+  if (!airStations.length) {
+    airEl.textContent = 'No air quality data yet.';
+    airEl.className = 'status';
+    return;
+  }
+  const worst = airStations.reduce((a, b) => (b.aqi > a.aqi ? b : a));
+  const band = aqiBand(worst.aqi);
+  const time = worst.time
+    ? new Date(worst.time).toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
+    : '';
+  airEl.textContent = `Air quality: ${worst.aqi} AQI, ${band.name} (${worst.name}${time ? `, ${time}` : ''})`;
+  airEl.className = 'status live';
+}
+
+async function pollAir() {
+  try {
+    const res = await fetch(`${AIR_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    airStations = Array.isArray(data.stations) ? data.stations : [];
+    const src = map.getSource('air');
+    if (src) {
+      src.setData({
+        type: 'FeatureCollection',
+        features: airStations.map((s) => ({
+          type: 'Feature',
+          properties: { aqi: s.aqi, name: s.name, time: s.time },
+          geometry: { type: 'Point', coordinates: [s.lon, s.lat] },
+        })),
+      });
+    }
+  } catch {
+    // Keep whatever we last knew; the panel line explains the gap.
+  }
+  renderAir();
+}
+
+async function poll() {
+  await Promise.all([pollUpdated(), pollAir()]);
+}
+
 // --- Boot ----------------------------------------------------------------------
 map.on('error', (e) => {
   // Missing traffic tiles (before the first refresh) are expected, not errors.
@@ -269,6 +345,7 @@ map.on('load', () => {
   addParks();
   addTraffic();
   addPois();
+  addAir();
   setupOrbit();
 
   if (reduceMotion) {
@@ -278,8 +355,8 @@ map.on('load', () => {
     map.easeTo({ bearing: homeBearing(), pitch: CORRIDOR.pitch, duration: 2200 });
   }
 
-  pollUpdated();
-  setInterval(pollUpdated, POLL_MS);
+  poll();
+  setInterval(poll, POLL_MS);
   setInterval(renderStatus, 30_000);
 });
 
