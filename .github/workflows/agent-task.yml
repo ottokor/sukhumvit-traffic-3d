@@ -133,6 +133,7 @@ jobs:
         if: steps.impl.outputs.status == 'done' && steps.impl.outputs.changed == 'true'
         run: |
           TITLE=$(gh issue view "$ISSUE" --json title -q .title)
+          bash .github/agents/park-workflow-edits.sh
           git add -A
           git commit -q -m "Implement #${ISSUE}: ${TITLE}" -m "$(cat .agent/impl_summary.md)" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
           git push -u origin "$BRANCH"
@@ -150,6 +151,12 @@ jobs:
             cat .agent/impl_summary.md
             echo
             if [ -s .agent/impl_tests.md ]; then echo "## Tests the implementer ran"; cat .agent/impl_tests.md; echo; fi
+            if [ -s .agent/parked.txt ]; then
+              echo "## ⚠️ Workflow changes to apply by hand"
+              echo "GitHub does not let the Actions token push edits to \`.github/workflows/\`, so the agent's versions are parked in \`.github/proposed-workflows/\`. After merging, move each one over its original (or ask Claude to):"
+              sed 's#^#- \`#; s#$#\`#' .agent/parked.txt
+              echo
+            fi
             echo "_Built by the agent pipeline ($RUN_URL). The review pass is posted as a comment below._"
           } > .agent/pr_body.md
           if [ -z "$NUMBER" ]; then
@@ -233,6 +240,7 @@ jobs:
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           jq -r '.summary // ""' <<<"${OUT:-{}}" > .agent/fix_summary.md 2>/dev/null || true
           jq -r '.question // ""' <<<"${OUT:-{}}" > .agent/fix_question.md 2>/dev/null || true
+          bash .github/agents/park-workflow-edits.sh
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
             git commit -q -m "Address review findings for #${ISSUE}" -m "$(cat .agent/fix_summary.md)" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
