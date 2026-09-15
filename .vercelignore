@@ -4,6 +4,7 @@
 .claude
 tests
 scripts/refresh-traffic.mjs
+scripts/refresh-air.mjs
 scripts/dev-server.mjs
 *.md
 package.json

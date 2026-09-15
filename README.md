@@ -23,9 +23,10 @@ Open http://localhost:3000. No install step; there are no dependencies. The dev 
 has run once. `/coffee` serves the filter-coffee side project.
 
 ```bash
-npm test        # tile maths, corridor config, budget
+npm test        # tile maths, corridor config, AQI bands, budget
 npm run tiles   # print the tile list and the TomTom request budget (no key needed)
-TOMTOM_API_KEY=... npm run refresh   # fetch tiles into public/traffic/ for local testing
+TOMTOM_API_KEY=... npm run refresh       # fetch tiles into public/traffic/ for local testing
+WAQI_TOKEN=... npm run refresh:air       # fetch air.json into public/traffic/ for local testing
 ```
 
 ## How it works
@@ -47,6 +48,8 @@ TOMTOM_API_KEY=... npm run refresh   # fetch tiles into public/traffic/ for loca
 | `map.js` | MapLibre map, locked camera with a custom orbit handler, park highlight, traffic raster, status text. |
 | `scripts/tiles.mjs` | Pure slippy-map tile maths, shared. |
 | `scripts/refresh-traffic.mjs` | Computes the tile list and budget, fetches from TomTom, writes tiles + `updated.json`. |
+| `scripts/refresh-air.mjs` | Fetches WAQI stations for the padded corridor bounds, writes `air.json`. |
+| `scripts/aqi.mjs` | Pure US EPA AQI band/colour mapping, shared by `map.js` and tests. |
 | `scripts/dev-server.mjs` | Zero-dependency static server with the same `/traffic/` behaviour as production. |
 | `vercel.json` | Rewrites `/traffic/*` to the data branch. |
 | `coffee/index.html` | Separate finished mini-app, deployed at `/coffee`. |
@@ -78,6 +81,20 @@ three times, which counts against the budget; if you ever see 429s, drop `paddin
 
 The frontend shows "Traffic updated HH:MM Bangkok time" from `updated.json` and marks it stale after
 15 minutes. Before the first refresh it says so instead of failing.
+
+### Air quality
+`scripts/refresh-air.mjs` runs in the same refresh job, right after the tile fetch. If `WAQI_TOKEN` is
+set it queries WAQI's `/map/bounds/` endpoint for the corridor bounds padded ~2 km (`CORRIDOR.airBounds`
+in `corridor.js` — official government stations are sparse, so a bare corridor box is often empty) and
+writes `traffic/air.json` alongside the tiles, published the same way. A missing token or a failed WAQI
+request only warns; it never stops tiles from publishing.
+
+The number shown is the **US AQI, almost always driven by PM2.5** in Bangkok — not a raw µg/m³ reading
+and not the same scale as Thailand's own PCD AQI. Roughly: 0–50 good, 51–100 moderate, 101–150 unhealthy
+for sensitive groups, 151–200 unhealthy, 201–300 very unhealthy, 301+ hazardous
+(`scripts/aqi.mjs`, the colours behind the map dots and the panel legend). The panel shows the worst
+station currently in the padded corridor; station data updates on WAQI's own schedule, not every 5
+minutes.
 
 ### TomTom terms on caching (checked 2026-09-14)
 TomTom's tile responses carry `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate`,
@@ -112,6 +129,7 @@ Nothing in the frontend needs an environment variable. The TomTom key lives only
 | Secret | Used by | Where to get it |
 | --- | --- | --- |
 | `TOMTOM_API_KEY` | `refresh-traffic.yml` | developer.tomtom.com → your app → key with Traffic API enabled |
+| `WAQI_TOKEN` (optional) | `refresh-traffic.yml` | aqicn.org/data-platform/token — free token; without it the air-quality overlay just stays empty |
 | `CLAUDE_CODE_OAUTH_TOKEN` **or** `ANTHROPIC_API_KEY` | all Claude workflows | `claude setup-token` in a terminal (Claude subscription) **or** console.anthropic.com API key |
 
 Or from a terminal: `gh secret set TOMTOM_API_KEY` (it prompts for the value, nothing is echoed).
@@ -174,7 +192,7 @@ Labels the pipeline uses: `agent` (start), `agent-working`, `agent-done`, `needs
 - **`pr-review.yml`** – reviews pull requests *you* open, with the same reviewer brief, as one sticky
   comment plus inline notes. Agent branches are skipped (they are reviewed inside the pipeline).
 - **`ci.yml`** – syntax check, unit tests, tile budget, and a grep that fails if the frontend ever
-  references TomTom or a key. Runs on PRs and pushes to `main`.
+  references TomTom, WAQI or a key/token. Runs on PRs and pushes to `main`.
 
 ### Who can trigger the Claude workflows
 The Claude token is a personal subscription credential, so every workflow that uses it is gated
