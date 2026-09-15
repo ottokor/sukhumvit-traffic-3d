@@ -25,10 +25,10 @@ jobs:
         run: npm test
       - name: Tile list and TomTom budget
         run: node scripts/refresh-traffic.mjs --dry-run
-      - name: Frontend must never talk to TomTom directly or contain a key
+      - name: Frontend must never talk to TomTom or WAQI directly, or contain a key
         run: |
-          if grep -nE 'api\.tomtom\.com|TOMTOM_API_KEY|key=' index.html map.js style.css corridor.js; then
-            echo "::error::Frontend references TomTom or an API key. Traffic must come from /traffic/ only."
+          if grep -nE 'api\.tomtom\.com|TOMTOM_API_KEY|api\.waqi\.info|WAQI_TOKEN|key=|token=' index.html map.js style.css corridor.js; then
+            echo "::error::Frontend references TomTom, WAQI or a key/token. Traffic and air quality must come from /traffic/ only."
             exit 1
           fi
           echo "ok"

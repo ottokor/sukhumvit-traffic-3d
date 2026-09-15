@@ -71,6 +71,31 @@ jobs:
           REFRESH_INTERVAL_MINUTES: 5
         run: node scripts/refresh-traffic.mjs
 
+      - name: Check the WAQI token is configured
+        id: airkey
+        env:
+          WAQI_TOKEN: ${{ secrets.WAQI_TOKEN }}
+        run: |
+          if [ -z "$WAQI_TOKEN" ]; then
+            echo "::warning::WAQI_TOKEN secret is not set — skipping air-quality fetch. Add it under Settings → Secrets and variables → Actions."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch air quality from WAQI
+        id: air
+        if: steps.airkey.outputs.present == 'true' && steps.fresh.outputs.fresh != 'true'
+        continue-on-error: true
+        env:
+          WAQI_TOKEN: ${{ secrets.WAQI_TOKEN }}
+          OUT_DIR: out/traffic
+        run: node scripts/refresh-air.mjs
+
+      - name: Report a failed air-quality fetch
+        if: steps.air.outcome == 'failure'
+        run: echo "::warning::WAQI fetch failed this round; the site will show no air-quality data until the next successful fetch."
+
       - name: Publish to the traffic-data branch
         if: steps.fetch.outcome == 'success'
         run: |
@@ -81,7 +106,9 @@ jobs:
           git add -A
           git commit -q -m "traffic tiles $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" traffic-data
-          echo "Published $(find traffic -name '*.png' | wc -l) tiles to traffic-data"
+          AIR_NOTE=""
+          [ -f traffic/air.json ] && AIR_NOTE=" + air.json"
+          echo "Published $(find traffic -name '*.png' | wc -l) tiles${AIR_NOTE} to traffic-data"
 
       - name: Report a failed fetch
         if: steps.fetch.outcome == 'failure'
