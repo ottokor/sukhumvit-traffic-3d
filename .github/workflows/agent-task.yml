@@ -68,6 +68,9 @@ jobs:
       # ---------------------------------------------------------------- implement
       - name: Implement
         id: implement
+        # If the session ends abnormally (turn cap, transient API error) the files it wrote are
+        # still in the working tree; the next step keeps them so the work is not thrown away.
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -80,7 +83,7 @@ jobs:
             You are on branch ${{ env.BRANCH }}. Only edit files in the working tree; do NOT run git commit/push and do NOT open a PR — the workflow does that after you return.
             Finish by returning the structured result described in implementer.md.
           claude_args: |
-            --max-turns 80
+            --max-turns 150
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(gh issue view:*),Bash(node:*),Bash(npm test:*),Bash(npm run:*),Bash(ls:*),Bash(cat:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*)"
             --json-schema '{"type":"object","properties":{"status":{"type":"string","enum":["done","needs_human","failed"]},"summary":{"type":"string"},"question":{"type":"string"},"tests_run":{"type":"string"}},"required":["status","summary"]}'
 
@@ -91,8 +94,14 @@ jobs:
         run: |
           mkdir -p .agent
           if [ -z "$OUT" ] || ! jq -e . >/dev/null 2>&1 <<<"$OUT"; then
-            echo "status=failed" >> "$GITHUB_OUTPUT"
-            echo "The implementer returned no structured result." > .agent/impl_summary.md
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "status=done" >> "$GITHUB_OUTPUT"
+              printf '%s\n' "⚠️ **The implementer's session ended without a final report** (outcome: ${{ steps.implement.outcome }}, see $RUN_URL) but it had already made the changes in this PR. Read them with extra care; the reviewer's verdict follows below." > .agent/impl_summary.md
+            else
+              echo "status=failed" >> "$GITHUB_OUTPUT"
+              echo "The implementer returned no result and changed no files (outcome: ${{ steps.implement.outcome }})." > .agent/impl_summary.md
+            fi
+            : > .agent/impl_question.md; : > .agent/impl_tests.md
           else
             echo "status=$(jq -r '.status' <<<"$OUT")" >> "$GITHUB_OUTPUT"
             jq -r '.summary' <<<"$OUT" > .agent/impl_summary.md
@@ -102,6 +111,13 @@ jobs:
           # .agent/ is gitignored, so a plain status check ignores it.
           if [ -n "$(git status --porcelain)" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
           git status --short
+
+      - name: Implementer failed
+        if: steps.impl.outputs.status == 'failed'
+        run: |
+          gh issue edit "$ISSUE" --add-label needs-human --remove-label agent-working 2>/dev/null || true
+          { echo "⚠️ **The implementer did not produce anything.** $(cat .agent/impl_summary.md)"; echo; echo "Run log: $RUN_URL — add the \`agent\` label again to retry."; } | gh issue comment "$ISSUE" --body-file -
+          exit 1
 
       - name: Ask the human (implementer needs a decision)
         if: steps.impl.outputs.status == 'needs_human'
@@ -190,7 +206,7 @@ jobs:
             (outcome: ${{ steps.test.outcome }}). You may run `npm test` and `npm run tiles` yourself.
             Do not edit files and do not post comments; return only the structured verdict.
           claude_args: |
-            --max-turns 40
+            --max-turns 60
             --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(gh issue view:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(node:*),Bash(npm test:*),Bash(npm run:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","request_changes","needs_human"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","properties":{"severity":{"type":"string","enum":["blocker","major","minor","nit"]},"file":{"type":"string"},"description":{"type":"string"},"fix":{"type":"string"}},"required":["severity","description"]}},"question":{"type":"string"}},"required":["verdict","summary","findings"]}'
 
@@ -226,7 +242,7 @@ jobs:
             Resolve them on the checked-out branch. Only edit files; do NOT run git commit/push.
             Return the structured result described in fixer.md.
           claude_args: |
-            --max-turns 60
+            --max-turns 100
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(gh issue view:*),Bash(node:*),Bash(npm test:*),Bash(npm run:*),Bash(git diff:*),Bash(git status:*)"
             --json-schema '{"type":"object","properties":{"status":{"type":"string","enum":["done","needs_human","failed"]},"summary":{"type":"string"},"question":{"type":"string"}},"required":["status","summary"]}'
 
@@ -267,7 +283,7 @@ jobs:
             There will be no further fix round: return `approve` if the PR is safe for the human to merge,
             otherwise `needs_human` with a short `question` explaining what still needs a human.
           claude_args: |
-            --max-turns 30
+            --max-turns 40
             --allowedTools "Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(gh issue view:*),Bash(gh pr view:*),Bash(node:*),Bash(npm test:*),Bash(npm run:*)"
             --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["approve","request_changes","needs_human"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","properties":{"severity":{"type":"string","enum":["blocker","major","minor","nit"]},"file":{"type":"string"},"description":{"type":"string"},"fix":{"type":"string"}},"required":["severity","description"]}},"question":{"type":"string"}},"required":["verdict","summary","findings"]}'
 
