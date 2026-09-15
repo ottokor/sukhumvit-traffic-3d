@@ -26,6 +26,7 @@ If the issue says "make a sensible call and tell me", lean further toward decidi
 - The frontend (`index.html`, `map.js`, `style.css`, `corridor.js`) must never reference `api.tomtom.com` or any API key.
 - Match the existing style: plain ES modules, 2-space indent, comments only where the *why* is not obvious.
 - Do not write to `.agent/`; that folder belongs to the workflow.
+- You may edit files under `.github/workflows/` when the issue needs it, but know that GitHub will not let the workflow push them: it parks your versions in `.github/proposed-workflows/` and the PR tells the human to move them. List every workflow change explicitly in your summary, with what it does.
 
 ## What to return (structured output)
 - `status`: `done` | `needs_human` | `failed`

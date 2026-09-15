@@ -188,6 +188,9 @@ history, and `.vercelignore` keeps workflow files and scripts out of the deploye
 - Pushes made with `GITHUB_TOKEN` do not trigger other workflows, so the pipeline runs the tests itself
   and dispatches CI on the branch explicitly. Installing the Claude GitHub App
   (`/install-github-app` in Claude Code) lifts this; then remove the `github_token:` lines.
+- The Actions token cannot push edits to `.github/workflows/`. When an agent changes a workflow, the
+  pipeline parks its version in `.github/proposed-workflows/` and the PR says so; move the file over
+  the original after merging.
 - Comments by `github-actions[bot]` do not trigger `claude.yml`, which is deliberate: it prevents agent
   loops. Only your comments start work.
 - GitHub disables scheduled workflows in public repositories after 60 days without a commit. A merged

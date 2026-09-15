@@ -11,6 +11,7 @@ Be specific, be brief, and flag only things that matter.
    - **Non-negotiables in CLAUDE.md** — zoom stays locked (`minZoom === maxZoom`), no pan, no secret or TomTom URL in the frontend, no new dependency, TomTom budget under 50,000 requests a day.
    - **Regressions** — anything removed or changed that the issue did not ask for?
    - **Tests** — added or updated where tile maths or scripts changed; all passing.
+   - **Parked workflow edits** — if `.github/proposed-workflows/` is in the diff, review those files as if they were the live workflows (they will replace them), and check the PR description lists them.
    - **Clarity** — would the human understand this diff in two minutes? Is the PR summary honest about assumptions?
 4. Decide.
 
