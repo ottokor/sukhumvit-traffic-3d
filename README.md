@@ -116,7 +116,9 @@ Two Vercel projects, both under the same account:
    `ottokor/sukhumvit-traffic-3d`. Framework preset **Other**, no build command, output directory `.`
    (root). Deploy. Every push to `main` redeploys, so merged agent PRs go live on their own.
    `vercel.json` rewrites `/traffic/*` to the `traffic-data` branch on raw.githubusercontent.com, whose
-   CDN caches each file for up to five minutes.
+   CDN caches each file for up to five minutes. It also disables Vercel deployments for the
+   `traffic-data` branch: that branch is force-pushed every five minutes and would otherwise burn
+   through the Hobby plan's 100 deployments a day and block production deploys of `main`.
 2. **ottokorpela.com → mounts it at `/bangkoktraffic`.** `next.config.ts` in the site repo has three
    rewrites: `/bangkoktraffic` and `/bangkoktraffic/*` proxy to `sukhumvit-traffic-3d.vercel.app`, and
    `/bangkoktraffic/traffic/*` goes straight to the data branch. `index.html` sets a `<base>` tag when

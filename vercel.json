@@ -9,7 +9,17 @@
   "headers": [
     {
       "source": "/traffic/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=60, stale-while-revalidate=120" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=60, stale-while-revalidate=120"
+        }
+      ]
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "traffic-data": false
+    }
+  }
 }
