@@ -71,24 +71,6 @@ jobs:
           REFRESH_INTERVAL_MINUTES: 5
         run: node scripts/refresh-traffic.mjs
 
-      - name: Publish to the traffic-data branch
-        if: steps.fetch.outcome == 'success'
-        run: |
-          cd out
-          git init -q -b traffic-data
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q -m "traffic tiles $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" traffic-data
-          AIR_NOTE=""
-          [ -f traffic/air.json ] && AIR_NOTE=" + air.json"
-          echo "Published $(find traffic -name '*.png' | wc -l) tiles${AIR_NOTE} to traffic-data"
-
-      - name: Report a failed fetch
-        if: steps.fetch.outcome == 'failure'
-        run: echo "::warning::TomTom fetch failed this round; the site keeps the previous tiles. See the step log above."
-
       - name: Check the WAQI token is configured
         id: airkey
         env:
@@ -113,6 +95,24 @@ jobs:
       - name: Report a failed air-quality fetch
         if: steps.air.outcome == 'failure'
         run: echo "::warning::WAQI fetch failed this round; the site will show no air-quality data until the next successful fetch."
+
+      - name: Publish to the traffic-data branch
+        if: steps.fetch.outcome == 'success'
+        run: |
+          cd out
+          git init -q -b traffic-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "traffic tiles $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" traffic-data
+          AIR_NOTE=""
+          [ -f traffic/air.json ] && AIR_NOTE=" + air.json"
+          echo "Published $(find traffic -name '*.png' | wc -l) tiles${AIR_NOTE} to traffic-data"
+
+      - name: Report a failed fetch
+        if: steps.fetch.outcome == 'failure'
+        run: echo "::warning::TomTom fetch failed this round; the site keeps the previous tiles. See the step log above."
 
       - name: Keep-alive — re-dispatch this workflow ~5 minutes after it started
         if: always() && steps.key.outputs.present == 'true' && vars.REFRESH_KEEPALIVE == 'true'
