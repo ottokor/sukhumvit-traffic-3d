@@ -104,9 +104,10 @@ jobs:
             : > .agent/impl_question.md; : > .agent/impl_tests.md
           else
             echo "status=$(jq -r '.status' <<<"$OUT")" >> "$GITHUB_OUTPUT"
-            jq -r '.summary' <<<"$OUT" > .agent/impl_summary.md
-            jq -r '.question // ""' <<<"$OUT" > .agent/impl_question.md
-            jq -r '.tests_run // ""' <<<"$OUT" > .agent/impl_tests.md
+            strip() { sed -E 's#</?(summary|parameter|tests_run|question|status|findings|verdict)[^>]*>##g'; }
+            jq -r '.summary' <<<"$OUT" | strip > .agent/impl_summary.md
+            jq -r '.question // ""' <<<"$OUT" | strip > .agent/impl_question.md
+            jq -r '.tests_run // ""' <<<"$OUT" | strip > .agent/impl_tests.md
           fi
           # .agent/ is gitignored, so a plain status check ignores it.
           if [ -n "$(git status --porcelain)" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
@@ -222,7 +223,12 @@ jobs:
             echo '{"verdict":"needs_human","summary":"The reviewer agent returned no structured result.","findings":[],"question":"Please review this PR yourself."}' > .agent/review.json
           else
             printf '%s' "$OUT" > .agent/review.json
-            echo "verdict=$(jq -r '.verdict' <<<"$OUT")" >> "$GITHUB_OUTPUT"
+            # A "request changes" with no blocker/major finding gives the fixer nothing to do:
+            # treat it as an inconsistent review and hand it to the human instead.
+            if [ "$(jq -r '.verdict' .agent/review.json)" = "request_changes" ] && [ "$(jq '[.findings[] | select(.severity == "blocker" or .severity == "major")] | length' .agent/review.json)" = "0" ]; then
+              jq '.verdict = "needs_human" | .question = (if (.question // "") == "" then "The reviewer requested changes but listed nothing a fixer could act on, so its verdict is unreliable. Please review this PR yourself." else .question end)' .agent/review.json > .agent/review.tmp && mv .agent/review.tmp .agent/review.json
+            fi
+            echo "verdict=$(jq -r '.verdict' .agent/review.json)" >> "$GITHUB_OUTPUT"
           fi
           bash .github/agents/format-review.sh .agent/review.json "Review pass 1" > .agent/review.md
           gh pr comment "$PR" --body-file .agent/review.md
@@ -252,10 +258,10 @@ jobs:
         env:
           OUT: ${{ steps.fixer.outputs.structured_output }}
         run: |
-          STATUS=$(jq -r '.status // "failed"' <<<"${OUT:-{}}" 2>/dev/null || echo failed)
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          jq -r '.summary // ""' <<<"${OUT:-{}}" > .agent/fix_summary.md 2>/dev/null || true
-          jq -r '.question // ""' <<<"${OUT:-{}}" > .agent/fix_question.md 2>/dev/null || true
+          if [ -n "$OUT" ] && jq -e . >/dev/null 2>&1 <<<"$OUT"; then printf '%s' "$OUT" > .agent/fix.json; else echo '{}' > .agent/fix.json; fi
+          echo "status=$(jq -r '.status // "failed"' .agent/fix.json)" >> "$GITHUB_OUTPUT"
+          jq -r '.summary // ""' .agent/fix.json > .agent/fix_summary.md
+          jq -r '.question // ""' .agent/fix.json > .agent/fix_question.md
           bash .github/agents/park-workflow-edits.sh
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
