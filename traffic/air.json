@@ -1,0 +1,21 @@
+{
+  "updated": "2026-09-15T22:57:32.355Z",
+  "stations": [
+    {
+      "uid": 1861,
+      "name": "National Housing Authority Dindaeng, Bangkok, Thailand (การเคหะชุมชนดินแดง)",
+      "lat": 13.76251667,
+      "lon": 100.5502,
+      "aqi": 63,
+      "time": "2026-09-16T08:00:00+09:00"
+    },
+    {
+      "uid": 1857,
+      "name": "Chulalongkorn Hospital, Bangkok, Thailand (โรงพยาบาลจุฬาลงกรณ์)",
+      "lat": 13.729852,
+      "lon": 100.536501,
+      "aqi": 62,
+      "time": "2026-09-16T08:00:00+09:00"
+    }
+  ]
+}
