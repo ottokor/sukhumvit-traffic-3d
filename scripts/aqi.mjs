@@ -1,5 +1,5 @@
-// US EPA AQI bands and colours for the PM2.5-driven AQI that WAQI reports. Pure functions,
-// no dependencies, shared by the browser (map.js) and tests.
+// US EPA AQI bands and colours for the PM2.5-driven AQI that WAQI reports, plus WAQI station
+// name formatting. Pure functions, no dependencies, shared by the browser (map.js) and tests.
 
 export const AQI_BANDS = [
   { max: 50, name: 'good', color: '#00e400' },
@@ -20,4 +20,17 @@ export function aqiColorExpression(property = ['get', 'aqi']) {
   const expr = ['step', property, AQI_BANDS[0].color];
   for (let i = 1; i < AQI_BANDS.length; i++) expr.push(AQI_BANDS[i - 1].max + 1, AQI_BANDS[i].color);
   return expr;
+}
+
+/**
+ * A WAQI station's short English name, e.g. "Nonsi Witthaya School, Bangkok, Thailand"
+ * or "Chulalongkorn Hospital (โรงพยาบาลจุฬาลงกรณ์), Bangkok, Thailand" -> "Chulalongkorn Hospital".
+ */
+export function shortStationName(name) {
+  if (!name) return '';
+  return name
+    .replace(/,\s*Bangkok,\s*Thailand\s*$/i, '')
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }

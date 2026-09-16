@@ -2,7 +2,8 @@
 // The camera is locked: visitors can rotate and tilt only. No zoom, no pan.
 import { CORRIDOR } from './corridor.js';
 import { tileAlignedBounds } from './scripts/tiles.mjs';
-import { aqiBand, aqiColorExpression } from './scripts/aqi.mjs';
+import { aqiBand, aqiColorExpression, shortStationName } from './scripts/aqi.mjs';
+import { haversineKm, compassDirection } from './scripts/geo.mjs';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 // Traffic tiles come from our own cache (the traffic-data branch), never from TomTom directly.
@@ -27,8 +28,11 @@ const TRAFFIC_BOUNDS = tileAlignedBounds(CORRIDOR.bounds, finest.zoom, finest.pa
 
 const statusEl = document.getElementById('status');
 const airEl = document.getElementById('air');
+const airListEl = document.getElementById('air-list');
 const resetBtn = document.getElementById('reset');
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const CORRIDOR_CENTER = { lat: CORRIDOR.center[1], lon: CORRIDOR.center[0] };
+const MAX_AIR_ROWS = 6;
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -274,19 +278,48 @@ async function pollUpdated() {
 // --- Air quality: worst-station reading polled alongside the traffic timestamp -------
 let airStations = [];
 
+function stationTime(iso) {
+  return iso
+    ? new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
+    : '';
+}
+
 function renderAir() {
   if (!airStations.length) {
     airEl.textContent = 'No air quality data yet.';
     airEl.className = 'status';
+    airListEl.replaceChildren();
     return;
   }
-  const worst = airStations.reduce((a, b) => (b.aqi > a.aqi ? b : a));
+  const sorted = [...airStations].sort((a, b) => b.aqi - a.aqi);
+  const worst = sorted[0];
   const band = aqiBand(worst.aqi);
-  const time = worst.time
-    ? new Date(worst.time).toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
-    : '';
-  airEl.textContent = `Air quality: ${worst.aqi} AQI, ${band.name} (${worst.name}${time ? `, ${time}` : ''})`;
+  airEl.textContent = `Air quality (PM2.5 AQI) · worst ${worst.aqi}, ${band.name}`;
   airEl.className = 'status live';
+
+  airListEl.replaceChildren(...sorted.slice(0, MAX_AIR_ROWS).map((s) => {
+    const point = { lat: s.lat, lon: s.lon };
+    const dist = haversineKm(CORRIDOR_CENTER, point).toFixed(1);
+    const dir = compassDirection(CORRIDOR_CENTER, point);
+    const time = stationTime(s.time);
+
+    const chip = document.createElement('span');
+    chip.className = 'air-chip';
+    chip.style.background = aqiBand(s.aqi).color;
+    chip.textContent = s.aqi;
+
+    const name = document.createElement('span');
+    name.className = 'air-name';
+    name.textContent = shortStationName(s.name);
+
+    const meta = document.createElement('span');
+    meta.className = 'air-meta';
+    meta.textContent = `${dist} km ${dir}${time ? ` · ${time}` : ''}`;
+
+    const li = document.createElement('li');
+    li.append(chip, name, meta);
+    return li;
+  }));
 }
 
 async function pollAir() {
