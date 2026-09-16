@@ -28,9 +28,11 @@ export function aqiColorExpression(property = ['get', 'aqi']) {
  */
 export function shortStationName(name) {
   if (!name) return '';
+  // WAQI puts the Thai name in parentheses AFTER the city/country ("X, Bangkok, Thailand (ไทย)"),
+  // so remove parentheticals first, then the trailing city/country.
   return name
-    .replace(/,\s*Bangkok,\s*Thailand\s*$/i, '')
     .replace(/\s*\([^)]*\)/g, '')
+    .replace(/,\s*Bangkok,\s*Thailand\s*$/i, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

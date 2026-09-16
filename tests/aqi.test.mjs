@@ -36,6 +36,11 @@ test('shortStationName strips the trailing city/country and any Thai parenthetic
     shortStationName('Chulalongkorn Hospital (โรงพยาบาลจุฬาลงกรณ์), Bangkok, Thailand'),
     'Chulalongkorn Hospital',
   );
+  // The format WAQI actually returns for Bangkok stations: Thai name after the country.
+  assert.equal(
+    shortStationName('Nonsi Witthaya School, Bangkok, Thailand (โรงเรียนนนทรีวิทยา)'),
+    'Nonsi Witthaya School',
+  );
   assert.equal(shortStationName('Din Daeng'), 'Din Daeng');
   assert.equal(shortStationName(''), '');
 });
