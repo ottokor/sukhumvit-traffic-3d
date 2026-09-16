@@ -5,9 +5,11 @@ name: Agent task
 #   → re-review (Claude) → hand the PR to the human with a clear label.
 # Claude only stops to ask you when the brief is genuinely ambiguous; otherwise it decides,
 # states the assumption in the PR, and the reviewer checks it.
+# Note: creating an issue with the `agent` label already fires a `labeled` event, so `opened`
+# is deliberately not listed — it caused every template-created issue to run the pipeline twice.
 on:
   issues:
-    types: [labeled, opened]
+    types: [labeled]
   workflow_dispatch:
     inputs:
       issue:
@@ -34,8 +36,7 @@ jobs:
     if: |
       github.actor == github.repository_owner && (
         github.event_name == 'workflow_dispatch' ||
-        (github.event.action == 'labeled' && github.event.label.name == 'agent') ||
-        (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent'))
+        (github.event.action == 'labeled' && github.event.label.name == 'agent')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 90
