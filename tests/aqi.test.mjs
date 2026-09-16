@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AQI_BANDS, aqiBand, aqiColorExpression } from '../scripts/aqi.mjs';
+import { AQI_BANDS, aqiBand, aqiColorExpression, shortStationName } from '../scripts/aqi.mjs';
 
 test('aqiBand maps every band boundary to the right name', () => {
   assert.equal(aqiBand(0).name, 'good');
@@ -28,4 +28,19 @@ test('aqiColorExpression places a stop just above every band boundary', () => {
   const stops = [];
   for (let i = 3; i < expr.length; i += 2) stops.push(expr[i]);
   assert.deepEqual(stops, [51, 101, 151, 201, 301]);
+});
+
+test('shortStationName strips the trailing city/country and any Thai parenthetical', () => {
+  assert.equal(shortStationName('Nonsi Witthaya School, Bangkok, Thailand'), 'Nonsi Witthaya School');
+  assert.equal(
+    shortStationName('Chulalongkorn Hospital (โรงพยาบาลจุฬาลงกรณ์), Bangkok, Thailand'),
+    'Chulalongkorn Hospital',
+  );
+  // The format WAQI actually returns for Bangkok stations: Thai name after the country.
+  assert.equal(
+    shortStationName('Nonsi Witthaya School, Bangkok, Thailand (โรงเรียนนนทรีวิทยา)'),
+    'Nonsi Witthaya School',
+  );
+  assert.equal(shortStationName('Din Daeng'), 'Din Daeng');
+  assert.equal(shortStationName(''), '');
 });

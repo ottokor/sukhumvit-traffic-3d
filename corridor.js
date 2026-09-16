@@ -4,10 +4,11 @@
 const BOUNDS = [100.55, 13.715, 100.592, 13.748];
 const CENTER = [100.571, 13.7315];
 
-// ~2 km of padding around the corridor for air-quality station lookups: official WAQI/PCD
-// stations are sparse, so the bare corridor box is often empty. 1° latitude ≈ 111.32 km;
-// 1° longitude narrows with cos(latitude).
-const AIR_PAD_KM = 2;
+// ~3 km of padding around the corridor for air-quality station lookups: official WAQI/PCD
+// stations are sparse and the ones found so far sit just outside the corridor box, so a
+// tighter pad leaves the panel empty. 1° latitude ≈ 111.32 km; 1° longitude narrows with
+// cos(latitude).
+const AIR_PAD_KM = 3;
 const KM_PER_DEG_LAT = 111.32;
 const padLat = AIR_PAD_KM / KM_PER_DEG_LAT;
 const padLon = AIR_PAD_KM / (KM_PER_DEG_LAT * Math.cos((CENTER[1] * Math.PI) / 180));
@@ -18,7 +19,7 @@ export const CORRIDOR = {
   // Phetchaburi Rd (north) to Rama IV Rd (south).
   bounds: BOUNDS,
   center: CENTER,
-  // Corridor bounds padded ~2 km on every side, used only to query WAQI for nearby stations.
+  // Corridor bounds padded ~3 km on every side, used only to query WAQI for nearby stations.
   airBounds: [BOUNDS[0] - padLon, BOUNDS[1] - padLat, BOUNDS[2] + padLon, BOUNDS[3] + padLat],
 
   // Camera the visitor starts from and returns to with "Reset view".

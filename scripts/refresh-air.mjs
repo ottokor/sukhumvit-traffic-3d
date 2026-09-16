@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Fetches WAQI air-quality stations for the corridor (padded ~2 km, see corridor.js) and
+// Fetches WAQI air-quality stations for the corridor (padded ~3 km, see corridor.js) and
 // writes OUT_DIR/air.json. WAQI_TOKEN is read from the environment and is never logged.
 // A missing token or a WAQI failure exits non-zero (or 0 for a missing token) but must never
 // stop scripts/refresh-traffic.mjs from publishing tiles — the workflow runs this separately.
