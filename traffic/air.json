@@ -1,0 +1,37 @@
+{
+  "updated": "2026-10-03T22:28:52.210Z",
+  "stations": [
+    {
+      "uid": 1813,
+      "name": "Nonsi Witthaya School, Bangkok, Thailand (โรงเรียนนนทรีวิทยา)",
+      "lat": 13.70806667,
+      "lon": 100.5473333,
+      "aqi": 63,
+      "time": "2026-10-04T00:00:00+09:00"
+    },
+    {
+      "uid": 1861,
+      "name": "National Housing Authority Dindaeng, Bangkok, Thailand (การเคหะชุมชนดินแดง)",
+      "lat": 13.76251667,
+      "lon": 100.5502,
+      "aqi": 73,
+      "time": "2026-10-04T00:00:00+09:00"
+    },
+    {
+      "uid": 1864,
+      "name": "Bodindecha Sing Singhaseni School, Bangkok, Thailand (โรงเรียนบดินทรเดชา (สิงห์ สิงหเสนี))",
+      "lat": 13.769634,
+      "lon": 100.614567,
+      "aqi": 63,
+      "time": "2026-10-04T08:00:00+09:00"
+    },
+    {
+      "uid": 1857,
+      "name": "Chulalongkorn Hospital, Bangkok, Thailand (โรงพยาบาลจุฬาลงกรณ์)",
+      "lat": 13.729852,
+      "lon": 100.536501,
+      "aqi": 62,
+      "time": "2026-10-04T08:00:00+09:00"
+    }
+  ]
+}
